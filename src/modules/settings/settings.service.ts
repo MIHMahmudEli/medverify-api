@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OrganizationSettings } from '../../database/entities/organization-settings.entity';
+import { ensureSchema } from '../../database/schema-init';
 
 @Injectable()
 export class SettingsService implements OnModuleInit {
@@ -11,6 +12,7 @@ export class SettingsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    await ensureSchema(this.settingsRepository.manager.connection);
     await this.getSettings();
   }
 
@@ -25,6 +27,13 @@ export class SettingsService implements OnModuleInit {
         orgEmail: 'info@mysamedicalbd.com',
         reportHeaderTitle: 'MEDICAL TEST REPORT',
         disclaimerText: 'This is an auto generated report, does not require any signature.',
+        certificateTitle: 'MEDICAL FITNESS CERTIFICATE',
+        certificateNumberPrefix: 'MC',
+        signatoryName: 'Dr. A. K. M. Shamsuddin',
+        signatoryDesignation: 'MBBS, FCPS - Medical Director',
+        signatoryLicenseNumber: 'BMDC Reg No: A-12345',
+        certificateFooter: 'This official certificate verifies fitness for overseas employment. Authenticate online using the security QR code.',
+        certificateValidityDays: 90,
       });
       settings = await this.settingsRepository.save(settings);
     }

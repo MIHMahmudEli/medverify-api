@@ -7,3 +7,4 @@ export * from './medical-report-revision.entity';
 export * from './report-verification-token.entity';
 export * from './audit-log.entity';
 export * from './organization-settings.entity';
+export * from './medical-certificate.entity';

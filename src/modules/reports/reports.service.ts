@@ -19,6 +19,10 @@ import { TemplatesService } from '../templates/templates.service';
 import { VerificationService } from '../verification/verification.service';
 import { PdfService } from '../pdf/pdf.service';
 import {
+  MedicalCertificate,
+  CertificateStatus,
+} from '../../database/entities/medical-certificate.entity';
+import {
   CreateReportDto,
   UpdateReportDto,
   FinalizeReportDto,
@@ -36,6 +40,8 @@ export class ReportsService {
     private revisionRepository: Repository<MedicalReportRevision>,
     @InjectRepository(Patient)
     private patientRepository: Repository<Patient>,
+    @InjectRepository(MedicalCertificate)
+    private certificateRepository: Repository<MedicalCertificate>,
     private templatesService: TemplatesService,
     private verificationService: VerificationService,
     private pdfService: PdfService,
@@ -315,6 +321,13 @@ export class ReportsService {
       // Issue new active verification token
       await this.verificationService.createTokenForReport(savedReport.id);
 
+      // Supersede previous active certificates for this report
+      await manager.update(
+        MedicalCertificate,
+        { reportId: report.id, status: CertificateStatus.ACTIVE },
+        { status: CertificateStatus.SUPERSEDED },
+      );
+
       return this.findOne(savedReport.id);
     });
   }
@@ -329,6 +342,17 @@ export class ReportsService {
       report.id,
       dto.revocationReason,
       user.id,
+    );
+
+    // Revoke any active certificates for this report
+    await this.certificateRepository.update(
+      { reportId: report.id, status: CertificateStatus.ACTIVE },
+      {
+        status: CertificateStatus.REVOKED,
+        revocationReason: dto.revocationReason,
+        revokedAt: new Date(),
+        revokedById: user.id,
+      },
     );
 
     return this.reportRepository.save(report);

@@ -4,11 +4,15 @@ import { ConfigService } from '@nestjs/config';
 import { VerificationService } from './verification.service';
 import { ReportVerificationToken } from '../../database/entities/report-verification-token.entity';
 import { MedicalReport, ReportStatus, MedicalFitnessStatus } from '../../database/entities/medical-report.entity';
+import { MedicalCertificate } from '../../database/entities/medical-certificate.entity';
+import { SettingsService } from '../settings/settings.service';
 
 describe('VerificationService', () => {
   let service: VerificationService;
   let mockTokenRepo: any;
   let mockReportRepo: any;
+  let mockCertRepo: any;
+  let mockSettingsService: any;
 
   beforeEach(async () => {
     mockTokenRepo = {
@@ -19,6 +23,29 @@ describe('VerificationService', () => {
     };
     mockReportRepo = {
       findOne: jest.fn(),
+    };
+    mockCertRepo = {
+      findOne: jest.fn(),
+      count: jest.fn().mockResolvedValue(10),
+      create: jest.fn((dto) => dto),
+      save: jest.fn((cert) => Promise.resolve({ id: 'cert-1', ...cert })),
+    };
+    mockSettingsService = {
+      getSettings: jest.fn().mockResolvedValue({
+        orgName: 'MYSA Medical Center',
+        certificateTitle: 'MEDICAL FITNESS CERTIFICATE',
+        publicDisclosure: {
+          patientNameMode: 'INITIALS',
+          showPassport: false,
+          showDob: false,
+          showNationality: true,
+          showDestination: true,
+          showDetailedReport: false,
+          allowedReportSections: ['physical', 'systemic', 'lab', 'xray'],
+          allowPublicDownload: true,
+          allowPublicPrint: true,
+        },
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -31,6 +58,14 @@ describe('VerificationService', () => {
         {
           provide: getRepositoryToken(MedicalReport),
           useValue: mockReportRepo,
+        },
+        {
+          provide: getRepositoryToken(MedicalCertificate),
+          useValue: mockCertRepo,
+        },
+        {
+          provide: SettingsService,
+          useValue: mockSettingsService,
         },
         {
           provide: ConfigService,
@@ -53,6 +88,7 @@ describe('VerificationService', () => {
   });
 
   it('should mask patient full name to initials only on public verification', async () => {
+    mockCertRepo.findOne.mockResolvedValue(null);
     mockTokenRepo.findOne.mockResolvedValue({
       id: 'tok-1',
       token: 'sample-token',
@@ -75,12 +111,13 @@ describe('VerificationService', () => {
     expect(res.status).toBe('VALID');
     expect(res.registrationNumber).toBe('MMS2509341');
     expect(res.patientInitials).toBe('M*** M***');
-    // Ensure sensitive fields are never leaked to public
-    expect((res as any).passportNumber).toBeUndefined();
+    // Ensure sensitive fields are not leaked when disclosure is disabled
+    expect(res.patient?.passportNumber).toBeUndefined();
     expect((res as any).reportData).toBeUndefined();
   });
 
   it('should return REVOKED status when token or report is revoked', async () => {
+    mockCertRepo.findOne.mockResolvedValue(null);
     mockTokenRepo.findOne.mockResolvedValue({
       id: 'tok-1',
       token: 'revoked-token',
@@ -102,6 +139,7 @@ describe('VerificationService', () => {
   });
 
   it('should return INVALID when token does not exist', async () => {
+    mockCertRepo.findOne.mockResolvedValue(null);
     mockTokenRepo.findOne.mockResolvedValue(null);
     const res = await service.verifyPublicToken('non-existent-token');
     expect(res.verified).toBe(false);

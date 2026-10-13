@@ -14,6 +14,7 @@ import { User } from './user.entity';
 import { ReportTemplateVersion } from './report-template-version.entity';
 import { MedicalReportRevision } from './medical-report-revision.entity';
 import { ReportVerificationToken } from './report-verification-token.entity';
+import { MedicalCertificate } from './medical-certificate.entity';
 
 export enum ReportStatus {
   DRAFT = 'DRAFT',
@@ -123,6 +124,9 @@ export class MedicalReport {
 
   @OneToMany(() => ReportVerificationToken, (tok) => tok.report)
   verificationTokens: ReportVerificationToken[];
+
+  @OneToMany(() => MedicalCertificate, (cert) => cert.report)
+  certificates: MedicalCertificate[];
 
   @CreateDateColumn({ type: 'timestamp with time zone' })
   createdAt: Date;

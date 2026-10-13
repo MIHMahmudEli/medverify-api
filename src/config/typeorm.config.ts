@@ -10,6 +10,7 @@ import {
   ReportVerificationToken,
   AuditLog,
   OrganizationSettings,
+  MedicalCertificate,
 } from '../database/entities';
 import configuration from './configuration';
 
@@ -25,6 +26,7 @@ export const entityList = [
   ReportVerificationToken,
   AuditLog,
   OrganizationSettings,
+  MedicalCertificate,
 ];
 
 export const typeOrmModuleOptions: TypeOrmModuleOptions = {

@@ -18,6 +18,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { HealthModule } from './modules/health/health.module';
+import { CertificatesModule } from './modules/certificates/certificates.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -46,6 +47,7 @@ import { AppController } from './app.controller';
     AuditModule,
     SettingsModule,
     UploadsModule,
+    CertificatesModule,
   ],
   providers: [
     {
