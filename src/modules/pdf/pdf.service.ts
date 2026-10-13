@@ -252,63 +252,64 @@ export class PdfService {
         const rightDividerX = 488.4;
 
         // TABLE 1: MEDICAL EXAMINATION (LEFT)
+        const rowH = 13.8;
         // Main Header
-        doc.rect(leftTableX, tableTopY, leftTableW, 14.5).stroke();
+        doc.rect(leftTableX, tableTopY, leftTableW, rowH).stroke();
         doc.fillColor('#212529').fontSize(8.5).font('Helvetica-Bold');
-        doc.text('MEDICAL EXAMINATION', leftTableX, tableTopY + 3.5, { align: 'center', width: leftTableW });
+        doc.text('MEDICAL EXAMINATION', leftTableX, tableTopY + 3.2, { align: 'center', width: leftTableW });
 
         // Subheader
-        const subheaderY = tableTopY + 14.5;
-        doc.rect(leftTableX, subheaderY, leftTableW, 14.5).stroke();
-        doc.moveTo(leftDividerX, subheaderY).lineTo(leftDividerX, subheaderY + 14.5).stroke();
+        const subheaderY = tableTopY + rowH;
+        doc.rect(leftTableX, subheaderY, leftTableW, rowH).stroke();
+        doc.moveTo(leftDividerX, subheaderY).lineTo(leftDividerX, subheaderY + rowH).stroke();
         doc.fontSize(7.5).font('Helvetica-Bold');
-        doc.text('TYPE OF THE EXAM', leftTableX + 5, subheaderY + 3.5);
-        doc.text('RESULT', leftDividerX, subheaderY + 3.5, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
+        doc.text('TYPE OF THE EXAM', leftTableX + 5, subheaderY + 3.2);
+        doc.text('RESULT', leftDividerX, subheaderY + 3.2, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
 
-        let curLY = subheaderY + 14.5;
+        let curLY = subheaderY + rowH;
 
         // Helper for Left subheaders
         const drawSubHeaderLeft = (title: string) => {
-          doc.rect(leftTableX, curLY, leftTableW, 14.5).stroke();
+          doc.rect(leftTableX, curLY, leftTableW, rowH).stroke();
           doc.fillColor('#212529').fontSize(7.5).font('Helvetica-Bold');
-          doc.text(title, leftTableX, curLY + 3.5, { align: 'center', width: leftTableW });
-          curLY += 14.5;
+          doc.text(title, leftTableX, curLY + 3.2, { align: 'center', width: leftTableW });
+          curLY += rowH;
         };
 
         // Helper for Left rows
         const drawRowLeft = (exam: string, result: string, isResultRed: boolean = false) => {
-          doc.rect(leftTableX, curLY, leftTableW, 14.5).stroke();
-          doc.moveTo(leftDividerX, curLY).lineTo(leftDividerX, curLY + 14.5).stroke();
+          doc.rect(leftTableX, curLY, leftTableW, rowH).stroke();
+          doc.moveTo(leftDividerX, curLY).lineTo(leftDividerX, curLY + rowH).stroke();
           doc.fillColor('#212529').fontSize(7.5).font('Helvetica');
-          doc.text(exam, leftTableX + 5, curLY + 3.5, { width: leftDividerX - leftTableX - 10 });
+          doc.text(exam, leftTableX + 5, curLY + 3.2, { width: leftDividerX - leftTableX - 10 });
           if (isResultRed) {
             doc.fillColor('#ff0000').font('Helvetica-Bold');
           } else {
             doc.fillColor('#212529').font('Helvetica');
           }
-          doc.text(result || 'NAD', leftDividerX, curLY + 3.5, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
-          curLY += 14.5;
+          doc.text(result || 'NAD', leftDividerX, curLY + 3.2, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
+          curLY += rowH;
         };
 
-        // EYE Visual Acuity (29 pt high, double row)
-        doc.rect(leftTableX, curLY, leftTableW, 29).stroke();
-        doc.moveTo(leftDividerX, curLY).lineTo(leftDividerX, curLY + 29).stroke();
-        doc.moveTo(leftDividerX, curLY + 14.5).lineTo(leftTableX + leftTableW, curLY + 14.5).stroke();
+        // EYE Visual Acuity (27.6 pt high, double row)
+        doc.rect(leftTableX, curLY, leftTableW, rowH * 2).stroke();
+        doc.moveTo(leftDividerX, curLY).lineTo(leftDividerX, curLY + rowH * 2).stroke();
+        doc.moveTo(leftDividerX, curLY + rowH).lineTo(leftTableX + leftTableW, curLY + rowH).stroke();
         doc.fillColor('#212529').fontSize(7.5).font('Helvetica');
-        doc.text('EYE Visual Acuity', leftTableX + 5, curLY + 9);
-        doc.text(`R:  ${data.eye_visual_acuity_r || '6/6'}`, leftDividerX, curLY + 3.5, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
-        doc.text(`L:  ${data.eye_visual_acuity_l || '6/6'}`, leftDividerX, curLY + 17.5, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
-        curLY += 29;
+        doc.text('EYE Visual Acuity', leftTableX + 5, curLY + 8.5);
+        doc.text(`R:  ${data.eye_visual_acuity_r || '6/6'}`, leftDividerX, curLY + 3.2, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
+        doc.text(`L:  ${data.eye_visual_acuity_l || '6/6'}`, leftDividerX, curLY + rowH + 3.2, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
+        curLY += rowH * 2;
 
-        // EAR (29 pt high, double row)
-        doc.rect(leftTableX, curLY, leftTableW, 29).stroke();
-        doc.moveTo(leftDividerX, curLY).lineTo(leftDividerX, curLY + 29).stroke();
-        doc.moveTo(leftDividerX, curLY + 14.5).lineTo(leftTableX + leftTableW, curLY + 14.5).stroke();
+        // EAR (27.6 pt high, double row)
+        doc.rect(leftTableX, curLY, leftTableW, rowH * 2).stroke();
+        doc.moveTo(leftDividerX, curLY).lineTo(leftDividerX, curLY + rowH * 2).stroke();
+        doc.moveTo(leftDividerX, curLY + rowH).lineTo(leftTableX + leftTableW, curLY + rowH).stroke();
         doc.fillColor('#212529').fontSize(7.5).font('Helvetica');
-        doc.text('EAR', leftTableX + 5, curLY + 9);
-        doc.text(`R:  ${data.ear_r || 'NAD'}`, leftDividerX, curLY + 3.5, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
-        doc.text(`L:  ${data.ear_l || 'NAD'}`, leftDividerX, curLY + 17.5, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
-        curLY += 29;
+        doc.text('EAR', leftTableX + 5, curLY + 8.5);
+        doc.text(`R:  ${data.ear_r || 'NAD'}`, leftDividerX, curLY + 3.2, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
+        doc.text(`L:  ${data.ear_l || 'NAD'}`, leftDividerX, curLY + rowH + 3.2, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
+        curLY += rowH * 2;
 
         drawSubHeaderLeft('SYSTEMIC EXAM: CARDIO-VASCULAR');
         drawRowLeft('B.P', data.blood_pressure || '120/80');
@@ -337,38 +338,38 @@ export class PdfService {
         drawRowLeft('REMARKS', report.xrayRemarks || data.xray_remarks || 'NORMAL', true);
 
         // TABLE 2: LABORATORY INVESTIGATION (RIGHT)
-        doc.rect(rightTableX, tableTopY, rightTableW, 14.5).stroke();
+        doc.rect(rightTableX, tableTopY, rightTableW, rowH).stroke();
         doc.fillColor('#212529').fontSize(8.5).font('Helvetica-Bold');
-        doc.text('LABORATORY INVESTIGATION', rightTableX, tableTopY + 3.5, { align: 'center', width: rightTableW });
+        doc.text('LABORATORY INVESTIGATION', rightTableX, tableTopY + 3.2, { align: 'center', width: rightTableW });
 
-        doc.rect(rightTableX, subheaderY, rightTableW, 14.5).stroke();
-        doc.moveTo(rightDividerX, subheaderY).lineTo(rightDividerX, subheaderY + 14.5).stroke();
+        doc.rect(rightTableX, subheaderY, rightTableW, rowH).stroke();
+        doc.moveTo(rightDividerX, subheaderY).lineTo(rightDividerX, subheaderY + rowH).stroke();
         doc.fontSize(7.5).font('Helvetica-Bold');
-        doc.text('TYPE OF THE EXAM', rightTableX + 5, subheaderY + 3.5);
-        doc.text('RESULT', rightDividerX, subheaderY + 3.5, { width: rightTableW - (rightDividerX - rightTableX), align: 'center' });
+        doc.text('TYPE OF THE EXAM', rightTableX + 5, subheaderY + 3.2);
+        doc.text('RESULT', rightDividerX, subheaderY + 3.2, { width: rightTableW - (rightDividerX - rightTableX), align: 'center' });
 
-        let curRY = subheaderY + 14.5;
+        let curRY = subheaderY + rowH;
 
         // Helper for Right subheaders
         const drawSubHeaderRight = (title: string) => {
-          doc.rect(rightTableX, curRY, rightTableW, 14.5).stroke();
-          doc.fillColor('#212529').fontSize(7.5).font('Helvetica-Bold');
-          doc.text(title, rightTableX, curRY + 3.5, { align: 'center', width: rightTableW });
-          curRY += 14.5;
-        };
-
-        // Helper for Right rows
-        const drawRowRight = (exam: string, result: string, rowH: number = 14.5) => {
           doc.rect(rightTableX, curRY, rightTableW, rowH).stroke();
-          doc.moveTo(rightDividerX, curRY).lineTo(rightDividerX, curRY + rowH).stroke();
-          doc.fillColor('#212529').fontSize(7.5).font('Helvetica');
-          doc.text(exam, rightTableX + 5, curRY + (rowH > 14.5 ? 6 : 3.5), { width: rightDividerX - rightTableX - 10 });
-          doc.text(result || 'N/A', rightDividerX, curRY + (rowH > 14.5 ? 6 : 3.5), { width: rightTableW - (rightDividerX - rightTableX), align: 'center' });
+          doc.fillColor('#212529').fontSize(7.5).font('Helvetica-Bold');
+          doc.text(title, rightTableX, curRY + 3.2, { align: 'center', width: rightTableW });
           curRY += rowH;
         };
 
+        // Helper for Right rows
+        const drawRowRight = (exam: string, result: string, customRowH: number = rowH) => {
+          doc.rect(rightTableX, curRY, rightTableW, customRowH).stroke();
+          doc.moveTo(rightDividerX, curRY).lineTo(rightDividerX, curRY + customRowH).stroke();
+          doc.fillColor('#212529').fontSize(7.5).font('Helvetica');
+          doc.text(exam, rightTableX + 5, curRY + (customRowH > rowH ? 5.5 : 3.2), { width: rightDividerX - rightTableX - 10 });
+          doc.text(result || 'N/A', rightDividerX, curRY + (customRowH > rowH ? 5.5 : 3.2), { width: rightTableW - (rightDividerX - rightTableX), align: 'center' });
+          curRY += customRowH;
+        };
+
         drawRowRight('URINE FOR SUGAR - ALBUMIN', data.urine_sugar_albumin || 'NIL - NIL');
-        drawRowRight('URINE FOR OPIATES - CANNABIS - AMPHETAMINE', data.urine_opiates_cannabis || 'N/A - N/A - N/A', 21.75);
+        drawRowRight('URINE FOR OPIATES - CANNABIS - AMPHETAMINE', data.urine_opiates_cannabis || 'N/A - N/A - N/A', rowH * 1.5);
         drawRowRight('URINE FOR PREGNANCY TEST', data.urine_pregnancy || 'N/A');
 
         drawSubHeaderRight('OTHERS');
@@ -388,23 +389,28 @@ export class PdfService {
         drawRowRight('REMARKS', data.lab_remarks || 'NORMAL');
 
         // --- 6. STATUS, CHEST X-RAY & CRYPTOGRAPHIC QR VERIFICATION SECTION ---
-        // Left Side: Status and Remarks (Y = 643 to 705)
+        // Left Side: Status and Remarks (with generous top clearance ensuring zero overlap with upper table)
         const isFit = (report.finalMedicalStatus || 'FIT') === 'FIT';
         const statusText = report.finalMedicalStatus || 'FIT';
 
+        // Ensure at least 18pt of clean spacing between upper table bottom (curLY) and the status section
+        const statusTopY = Math.max(curLY + 18, 646);
+        const statusBoxW = isFit ? 28 : 40;
+        const statusBoxH = 17;
+
         doc.fillColor('#212529').fontSize(8).font('Helvetica');
-        doc.text('HIS/HER STATUS: ', 28.5, 644);
+        doc.text('HIS/HER STATUS: ', 28.5, statusTopY + 4);
 
-        // Status border box (red outline)
-        const statusBoxW = isFit ? 26 : 38;
+        // Status border box (red outline) with clean top spacing
         doc.lineWidth(0.8).strokeColor('#ff0000');
-        doc.rect(104, 639.5, statusBoxW, 16.5).stroke();
+        doc.rect(104, statusTopY, statusBoxW, statusBoxH).stroke();
         doc.fillColor('#212529').fontSize(8).font('Helvetica-Bold');
-        doc.text(statusText, 104, 644, { width: statusBoxW, align: 'center' });
+        doc.text(statusText, 104, statusTopY + 4.5, { width: statusBoxW, align: 'center' });
 
-        // Remarks at Y = 694
+        // Remarks at clean vertical offset below status
+        const remarksY = statusTopY + 36;
         doc.fillColor('#212529').fontSize(8).font('Helvetica-Bold');
-        doc.text('REMARKS: ', 28.5, 694, { continued: true });
+        doc.text('REMARKS: ', 28.5, remarksY, { continued: true });
         doc.fillColor('#ff0000');
         doc.text(`${report.finalRemarks || 'NORMAL,'}`);
 
