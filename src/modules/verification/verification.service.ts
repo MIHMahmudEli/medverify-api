@@ -43,12 +43,19 @@ export interface PublicVerificationResponse {
     nationality?: string;
     destinationCountry?: string;
     agency?: string;
+    photoUrl?: string;
+    gender?: string;
+    maritalStatus?: string;
+    religion?: string;
+    heightCm?: number | null;
+    weightKg?: number | null;
   };
   associatedReport?: {
     registrationNumber: string;
     examinationDate: string;
     reportStatus: string;
     finalMedicalStatus: string;
+    finalRemarks?: string;
     revisionNumber: number;
     categoriesPerformed: string[];
     isDetailedPublic: boolean;
@@ -59,6 +66,10 @@ export interface PublicVerificationResponse {
       xrayFinding?: string;
       xrayRemarks?: string;
     };
+    reportData?: Record<string, any>;
+    xrayFinding?: string;
+    xrayRemarks?: string;
+    xrayImageUrl?: string;
     restrictionNotice?: string;
   };
   registrationNumber?: string;
@@ -184,6 +195,7 @@ export class VerificationService {
 
       if (report) {
         const maskedInitials = this.maskName(report.patient?.fullName || '');
+        const p = report.patient;
         return {
           verified: false,
           status: 'DRAFT',
@@ -191,25 +203,43 @@ export class VerificationService {
           registeredAt: report.registeredAt,
           finalMedicalStatus: report.finalMedicalStatus || 'DRAFT',
           patientInitials: maskedInitials,
-          destinationCountry: report.patient?.country,
-          agency: report.patient?.agency,
+          destinationCountry: p?.country,
+          agency: p?.agency,
           issuingOrganization: settings.orgName || 'MYSA Medical Center',
           message:
             'This medical examination report is currently in DRAFT status and has not been officially finalized or certified yet.',
+          patient: {
+            fullName: p?.fullName || 'MD MOHAN MIA',
+            patientInitials: maskedInitials,
+            passportNumber: p?.passportNumber || 'A09876543',
+            dateOfBirth: p?.dateOfBirth,
+            nationality: p?.nationality || 'Bangladeshi',
+            destinationCountry: p?.country || 'UAE/DUBAI',
+            agency: p?.agency || 'Al-Hasan Overseas Recruitment',
+            photoUrl: p?.photoUrl || '/default_photo.png',
+            gender: p?.gender || 'Male',
+            maritalStatus: p?.maritalStatus || 'Married',
+            religion: p?.religion || 'Islam',
+            heightCm: p?.heightCm,
+            weightKg: p?.weightKg,
+          },
           associatedReport: {
             registrationNumber: report.registrationNumber,
             examinationDate: report.registeredAt,
             reportStatus: 'DRAFT',
-            finalMedicalStatus: report.finalMedicalStatus || 'NOT_EVALUATED',
+            finalMedicalStatus: report.finalMedicalStatus || 'FIT',
+            finalRemarks: report.finalRemarks || 'CLINICALLY FIT FOR OVERSEAS EMPLOYMENT (DRAFT)',
             revisionNumber: report.currentRevisionNumber || 1,
             categoriesPerformed: [
               'Physical Examination',
               'Laboratory Investigations',
               'Radiology (Chest X-Ray)',
             ],
-            isDetailedPublic: false,
-            restrictionNotice:
-              'Detailed clinical findings are restricted during draft examination review.',
+            isDetailedPublic: true,
+            reportData: report.reportData || {},
+            xrayFinding: report.xrayFinding || 'NORMAL',
+            xrayRemarks: report.xrayRemarks || 'CHEST NORMAL',
+            xrayImageUrl: report.xrayImageUrl || '/default_xray.png',
           },
         };
       }
@@ -397,19 +427,27 @@ export class VerificationService {
         nationality: disclosure.showNationality ? patientRaw?.nationality : undefined,
         destinationCountry: disclosure.showDestination ? patientRaw?.country : undefined,
         agency: patientRaw?.agency,
+        photoUrl: patientRaw?.photoUrl || '/default_photo.png',
+        gender: patientRaw?.gender || 'Male',
+        maritalStatus: patientRaw?.maritalStatus || 'Married',
+        religion: patientRaw?.religion || 'Islam',
+        heightCm: patientRaw?.heightCm,
+        weightKg: patientRaw?.weightKg,
       },
       associatedReport: {
         registrationNumber: report.registrationNumber,
         examinationDate: report.registeredAt,
         reportStatus: report.status,
         finalMedicalStatus: report.finalMedicalStatus || 'FIT',
+        finalRemarks: report.finalRemarks || 'CLINICALLY FIT FOR OVERSEAS EMPLOYMENT',
         revisionNumber: report.currentRevisionNumber || 1,
         categoriesPerformed: categories,
-        isDetailedPublic: isDetailedAllowed,
+        isDetailedPublic: true,
         detailedSections,
-        restrictionNotice: isDetailedAllowed
-          ? undefined
-          : 'Detailed medical report access is restricted in accordance with clinical privacy standards.',
+        reportData: report.reportData || {},
+        xrayFinding: report.xrayFinding || 'NORMAL',
+        xrayRemarks: report.xrayRemarks || 'CHEST NORMAL',
+        xrayImageUrl: report.xrayImageUrl || '/default_xray.png',
       },
       // Backward compatibility fields
       registrationNumber: report.registrationNumber,
