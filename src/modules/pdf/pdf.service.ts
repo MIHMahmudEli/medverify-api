@@ -388,13 +388,12 @@ export class PdfService {
     doc.font('Helvetica-Bold').fontSize(7).fillColor('#1e3a5f');
     doc.text('AUTHORIZED MEDICAL SIGNATORY & SEAL', rightAuthX, authY + 5.5, { align: 'center', width: rightAuthW });
 
-    // Signature Graphic if configured
-    const sigPath = this.resolveImagePath(settings?.signatorySignatureUrl);
+    // Signature Graphic
+    const sigPath = this.resolveImagePath(settings?.signatorySignatureUrl, 'doctor_signature.png');
     if (sigPath) {
       try {
-        doc.image(sigPath, rightAuthX + 50, authY + 35, { fit: [150, 45], align: 'center' });
+        doc.image(sigPath, rightAuthX + (rightAuthW - 130) / 2, authY + 28, { fit: [130, 48], align: 'center' });
       } catch (e) {
-        // Fallback signature line
         doc.lineWidth(0.6).strokeColor('#94a3b8').moveTo(rightAuthX + 30, authY + 75).lineTo(rightAuthX + rightAuthW - 30, authY + 75).stroke();
       }
     } else {
@@ -402,21 +401,35 @@ export class PdfService {
     }
 
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0f172a');
-    doc.text(signatoryName, rightAuthX + 15, authY + 86, { align: 'center', width: rightAuthW - 30 });
+    doc.text(signatoryName, rightAuthX + 15, authY + 84, { align: 'center', width: rightAuthW - 30 });
 
     doc.font('Helvetica').fontSize(7).fillColor('#475569');
-    doc.text(signatoryDesignation, rightAuthX + 15, authY + 98, { align: 'center', width: rightAuthW - 30 });
+    doc.text(signatoryDesignation, rightAuthX + 15, authY + 96, { align: 'center', width: rightAuthW - 30 });
 
     doc.font('Helvetica-Bold').fontSize(7).fillColor('#0d5c75');
-    doc.text(signatoryLicense, rightAuthX + 15, authY + 109, { align: 'center', width: rightAuthW - 30 });
+    doc.text(signatoryLicense, rightAuthX + 15, authY + 107, { align: 'center', width: rightAuthW - 30 });
 
     doc.font('Helvetica').fontSize(6).fillColor('#94a3b8');
-    doc.text('Official Clinical Director & Authorized Examiner', rightAuthX + 15, authY + 120, { align: 'center', width: rightAuthW - 30 });
+    doc.text('Official Clinical Director & Authorized Examiner', rightAuthX + 15, authY + 118, { align: 'center', width: rightAuthW - 30 });
 
-    // Seal badge
-    doc.rect(rightAuthX + (rightAuthW - 120) / 2, authY + 133, 120, 24).fill('#f1f5f9');
-    doc.lineWidth(0.5).strokeColor('#c5a059').rect(rightAuthX + (rightAuthW - 120) / 2, authY + 133, 120, 24).stroke();
-    doc.font('Helvetica-Bold').fontSize(6).fillColor('#1e3a5f').text('OFFICIAL CLINIC STAMP & SEAL', rightAuthX + (rightAuthW - 120) / 2, authY + 140, { align: 'center', width: 120 });
+    // Official Clinic Stamp & Seal
+    const stampPath = this.resolveImagePath(undefined, 'official_stamp.png');
+    if (stampPath) {
+      try {
+        doc.image(stampPath, rightAuthX + (rightAuthW - 48) / 2, authY + 128, {
+          fit: [48, 48],
+          align: 'center',
+        });
+      } catch (e) {
+        doc.rect(rightAuthX + (rightAuthW - 120) / 2, authY + 133, 120, 24).fill('#f1f5f9');
+        doc.lineWidth(0.5).strokeColor('#c5a059').rect(rightAuthX + (rightAuthW - 120) / 2, authY + 133, 120, 24).stroke();
+        doc.font('Helvetica-Bold').fontSize(6).fillColor('#1e3a5f').text('OFFICIAL CLINIC STAMP & SEAL', rightAuthX + (rightAuthW - 120) / 2, authY + 140, { align: 'center', width: 120 });
+      }
+    } else {
+      doc.rect(rightAuthX + (rightAuthW - 120) / 2, authY + 133, 120, 24).fill('#f1f5f9');
+      doc.lineWidth(0.5).strokeColor('#c5a059').rect(rightAuthX + (rightAuthW - 120) / 2, authY + 133, 120, 24).stroke();
+      doc.font('Helvetica-Bold').fontSize(6).fillColor('#1e3a5f').text('OFFICIAL CLINIC STAMP & SEAL', rightAuthX + (rightAuthW - 120) / 2, authY + 140, { align: 'center', width: 120 });
+    }
 
     // --- 8. OFFICIAL FOOTER ---
     const certFootY = 720;
