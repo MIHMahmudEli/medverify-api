@@ -6,6 +6,7 @@ import { ReportVerificationToken } from '../../database/entities/report-verifica
 import { MedicalReport, ReportStatus, MedicalFitnessStatus } from '../../database/entities/medical-report.entity';
 import { MedicalCertificate } from '../../database/entities/medical-certificate.entity';
 import { SettingsService } from '../settings/settings.service';
+import { PdfService } from '../pdf/pdf.service';
 
 describe('VerificationService', () => {
   let service: VerificationService;
@@ -71,6 +72,13 @@ describe('VerificationService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue('http://localhost:3000/verify'),
+          },
+        },
+        {
+          provide: PdfService,
+          useValue: {
+            generateCombinedPdf: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.4 mock combined')),
+            generateReportPdf: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.4 mock report')),
           },
         },
       ],

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 const PDFDocument = require('pdfkit');
 import * as QRCode from 'qrcode';
 import * as fs from 'fs';
@@ -18,7 +18,10 @@ export interface PdfRenderOptions {
 
 @Injectable()
 export class PdfService {
-  constructor(private readonly verificationService: VerificationService) {}
+  constructor(
+    @Inject(forwardRef(() => VerificationService))
+    private readonly verificationService: VerificationService,
+  ) {}
 
   private calculateAge(dobStr: string): string {
     if (!dobStr) return 'N/A';
@@ -128,13 +131,14 @@ export class PdfService {
       settings?.certificateFooter ||
       'This official certificate is generated and authenticated via MedVerify. Tampering or altering this document invalidates its certification.';
 
+    const safePatient = patient || ({} as Patient);
     const pageNum = opts.pageNumber || 1;
     const totalPages = opts.totalPages || 2;
     const qrUrl = opts.qrUrl || this.verificationService.getVerificationUrl(certificate.verificationToken);
     const qrBuffer = opts.qrBuffer;
 
     const isFit = (report.finalMedicalStatus || 'FIT') === 'FIT';
-    const age = this.calculateAge(patient.dateOfBirth);
+    const age = safePatient.dateOfBirth ? this.calculateAge(safePatient.dateOfBirth) : 'N/A';
 
     // Outer & Inner Elegant Certificate Frame
     doc.lineWidth(1.5).strokeColor('#1e3a5f');
@@ -224,10 +228,10 @@ export class PdfService {
 
     // Patient info rows inside details area
     const pRows = [
-      ['Full Name', (patient.fullName || '').toUpperCase(), 'Passport No', (patient.passportNumber || '').toUpperCase()],
-      ['Date of Birth', this.formatDate(patient.dateOfBirth), 'Age / Gender', `${age}  /  ${patient.gender || 'Male'}`],
-      ['Nationality', (patient.nationality || 'Bangladeshi').toUpperCase(), 'Marital Status', patient.maritalStatus || 'Unmarried'],
-      ['Destination', (patient.country || 'N/A').toUpperCase(), 'Recruiting Agency', patient.agency || '—'],
+      ['Full Name', (safePatient.fullName || '').toUpperCase(), 'Passport No', (safePatient.passportNumber || '').toUpperCase()],
+      ['Date of Birth', safePatient.dateOfBirth ? this.formatDate(safePatient.dateOfBirth) : 'N/A', 'Age / Gender', `${age}  /  ${safePatient.gender || 'Male'}`],
+      ['Nationality', (safePatient.nationality || 'Bangladeshi').toUpperCase(), 'Marital Status', safePatient.maritalStatus || 'Unmarried'],
+      ['Destination', (safePatient.country || 'N/A').toUpperCase(), 'Recruiting Agency', safePatient.agency || '—'],
     ];
 
     const rowHeight = pBoxH / 4;
@@ -248,7 +252,7 @@ export class PdfService {
 
     // Patient Photo
     const photoBoxX = 42 + detailsW;
-    const photoPath = this.resolveImagePath(patient.photoUrl, 'default_photo.png');
+    const photoPath = this.resolveImagePath(safePatient.photoUrl, 'default_photo.png');
     if (photoPath) {
       try {
         doc.image(photoPath, photoBoxX + 3, pBoxY + 3, {
@@ -443,8 +447,9 @@ export class PdfService {
     const qrBuffer = opts.qrBuffer;
     const qrUrl = opts.qrUrl || '';
 
+    const safePatient = patient || ({} as Patient);
     const data = report.reportData || {};
-    const age = this.calculateAge(patient.dateOfBirth);
+    const age = safePatient.dateOfBirth ? this.calculateAge(safePatient.dateOfBirth) : 'N/A';
 
     // --- 1. TOP HEADER BANNER ---
     const bannerPath = this.resolveImagePath(undefined, 'header_banner.png');
@@ -499,12 +504,12 @@ export class PdfService {
     doc.moveTo(vDiv3, pTableY).lineTo(vDiv3, pTableY + pTableH).stroke();
 
     const patientRows = [
-      ['NAME', (patient.fullName || '').toUpperCase(), 'COUNTRY', (patient.country || 'N/A').toUpperCase()],
-      ['PASSPORT NO', (patient.passportNumber || '').toUpperCase(), 'BIRTH DATE', this.formatDate(patient.dateOfBirth)],
-      ['MARITAL STATUS', patient.maritalStatus || 'Unmarried', 'RELIGION', patient.religion || 'Islam'],
-      ['AGE', age, 'GENDER', patient.gender || 'Male'],
-      ['NATIONALITY', patient.nationality || 'Bangladeshi', 'HEIGHT (CM)', patient.heightCm ? String(patient.heightCm) : ''],
-      ['AGENCY', patient.agency || '', 'WEIGHT (KG)', patient.weightKg ? String(patient.weightKg) : ''],
+      ['NAME', (safePatient.fullName || '').toUpperCase(), 'COUNTRY', (safePatient.country || 'N/A').toUpperCase()],
+      ['PASSPORT NO', (safePatient.passportNumber || '').toUpperCase(), 'BIRTH DATE', safePatient.dateOfBirth ? this.formatDate(safePatient.dateOfBirth) : 'N/A'],
+      ['MARITAL STATUS', safePatient.maritalStatus || 'Unmarried', 'RELIGION', safePatient.religion || 'Islam'],
+      ['AGE', age, 'GENDER', safePatient.gender || 'Male'],
+      ['NATIONALITY', safePatient.nationality || 'Bangladeshi', 'HEIGHT (CM)', safePatient.heightCm ? String(safePatient.heightCm) : ''],
+      ['AGENCY', safePatient.agency || '', 'WEIGHT (KG)', safePatient.weightKg ? String(safePatient.weightKg) : ''],
     ];
 
     patientRows.forEach((r, idx) => {
@@ -527,7 +532,7 @@ export class PdfService {
     });
 
     doc.rect(photoBoxX, pTableY, photoBoxW, photoBoxH).stroke();
-    const photoPath = this.resolveImagePath(patient.photoUrl, 'default_photo.png');
+    const photoPath = this.resolveImagePath(safePatient.photoUrl, 'default_photo.png');
     if (photoPath) {
       try {
         doc.image(photoPath, photoBoxX + 2, pTableY + 2, {

@@ -345,17 +345,18 @@ export class CertificatesService {
     if (!report) throw new NotFoundException('Report not found');
     const settings = await this.settingsService.getSettings();
 
+    const patient = report.patient || cert?.patient;
     let buffer: Buffer;
     if (cert) {
       buffer = await this.pdfService.generateCombinedPdf(
         cert,
         report,
-        report.patient,
+        patient,
         settings,
       );
     } else {
       // Fallback to report pdf if certificate cannot be issued (e.g. Draft)
-      buffer = await this.pdfService.generateReportPdf(report, report.patient);
+      buffer = await this.pdfService.generateReportPdf(report, patient);
     }
 
     const safeReg = report.registrationNumber.replace(/[^a-zA-Z0-9_-]/g, '');

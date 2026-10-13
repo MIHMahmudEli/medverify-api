@@ -2,6 +2,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,6 +14,7 @@ import { MedicalReport, ReportStatus } from '../../database/entities/medical-rep
 import { MedicalCertificate, CertificateStatus } from '../../database/entities/medical-certificate.entity';
 import { ConfigService } from '@nestjs/config';
 import { SettingsService } from '../settings/settings.service';
+import { PdfService } from '../pdf/pdf.service';
 
 export interface PublicVerificationResponse {
   verified: boolean;
@@ -82,6 +86,8 @@ export class VerificationService {
     private certificateRepository: Repository<MedicalCertificate>,
     private configService: ConfigService,
     private settingsService: SettingsService,
+    @Inject(forwardRef(() => PdfService))
+    private pdfService: PdfService,
   ) {}
 
   generateToken(): string {
@@ -212,7 +218,7 @@ export class VerificationService {
     // 2. Lookup in MedicalCertificate repository
     let certificate = await this.certificateRepository.findOne({
       where: { verificationToken: token },
-      relations: ['report', 'patient', 'issuedBy'],
+      relations: ['report', 'report.patient', 'patient', 'issuedBy'],
     });
 
     let report: MedicalReport | null = null;
@@ -424,5 +430,99 @@ export class VerificationService {
       where: { reportId, isRevoked: false },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  /**
+   * Generates combined official Two-Page PDF for public verification downloads.
+   * Page 1: Official Medical Fitness Certificate
+   * Page 2: Detailed Clinical Test Report
+   */
+  async getPublicCombinedPdfBuffer(token: string): Promise<{ buffer: Buffer; filename: string }> {
+    const settings = await this.settingsService.getSettings();
+    if (settings.publicDisclosure?.allowPublicDownload === false) {
+      throw new ForbiddenException(
+        'Public downloading of official medical records is restricted by organizational policy.',
+      );
+    }
+
+    let report: MedicalReport | null = null;
+    let certificate: MedicalCertificate | null = null;
+
+    if (token.startsWith('preview-')) {
+      const regNo = token.replace('preview-', '');
+      report = await this.reportRepository.findOne({
+        where: { registrationNumber: regNo },
+        relations: ['patient'],
+      });
+      if (!report) throw new NotFoundException('Medical report not found');
+    } else {
+      certificate = await this.certificateRepository.findOne({
+        where: { verificationToken: token },
+        relations: ['report', 'report.patient', 'patient', 'issuedBy'],
+      });
+
+      if (certificate) {
+        report = certificate.report;
+      } else {
+        const tokenRecord = await this.tokenRepository.findOne({
+          where: { token },
+          relations: ['report', 'report.patient'],
+        });
+
+        if (tokenRecord && tokenRecord.report) {
+          report = tokenRecord.report;
+          certificate = await this.certificateRepository.findOne({
+            where: { reportId: report.id },
+            relations: ['patient', 'issuedBy'],
+            order: { issuedAt: 'DESC' },
+          });
+        }
+      }
+    }
+
+    if (!report) {
+      throw new NotFoundException('Medical record not found for this verification signature.');
+    }
+
+    let patient = report.patient || certificate?.patient;
+    if (!patient && report.id) {
+      const fullReport = await this.reportRepository.findOne({
+        where: { id: report.id },
+        relations: ['patient'],
+      });
+      if (fullReport?.patient) {
+        patient = fullReport.patient;
+        report.patient = fullReport.patient;
+      }
+    }
+
+    let buffer: Buffer;
+    if (certificate) {
+      buffer = await this.pdfService.generateCombinedPdf(
+        certificate,
+        report,
+        patient,
+        settings,
+      );
+    } else {
+      // Draft / pre-approval preview combined document
+      const previewCert = {
+        certificateNumber: `DRAFT-${report.registrationNumber}`,
+        verificationToken: token,
+        issuedAt: new Date(),
+        status: CertificateStatus.ACTIVE,
+      } as any;
+      buffer = await this.pdfService.generateCombinedPdf(
+        previewCert,
+        report,
+        patient,
+        settings,
+      );
+    }
+
+    const safeReg = report.registrationNumber.replace(/[^a-zA-Z0-9_-]/g, '');
+    const filename = `Official_Certificate_and_Report_${safeReg}.pdf`;
+
+    return { buffer, filename };
   }
 }

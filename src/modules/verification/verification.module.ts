@@ -7,6 +7,7 @@ import { ReportVerificationToken } from '../../database/entities/report-verifica
 import { MedicalReport } from '../../database/entities/medical-report.entity';
 import { MedicalCertificate } from '../../database/entities/medical-certificate.entity';
 import { SettingsModule } from '../settings/settings.module';
+import { PdfModule } from '../pdf/pdf.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { SettingsModule } from '../settings/settings.module';
     ]),
     ConfigModule,
     SettingsModule,
+    forwardRef(() => PdfModule),
   ],
   controllers: [PublicVerificationController],
   providers: [VerificationService],
