@@ -44,11 +44,19 @@ export class VerificationService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
-  getVerificationUrl(token: string): string {
-    const baseUrl =
+  getBaseVerificationUrl(): string {
+    const rawBaseUrl =
       this.configService.get<string>('qrVerificationBaseUrl') ||
-      'http://localhost:3000/verify';
-    return `${baseUrl}/${token}`;
+      `${(this.configService.get<string>('frontendUrl') || 'http://localhost:3000').replace(/\/+$/, '')}/verify`;
+    return rawBaseUrl.replace(/\/+$/, '');
+  }
+
+  getVerificationUrl(token: string): string {
+    return `${this.getBaseVerificationUrl()}/${token}`;
+  }
+
+  getPreviewVerificationUrl(registrationNumber: string): string {
+    return `${this.getBaseVerificationUrl()}/preview-${registrationNumber}`;
   }
 
   async createTokenForReport(reportId: string): Promise<ReportVerificationToken> {
@@ -82,6 +90,26 @@ export class VerificationService {
   }
 
   async verifyPublicToken(token: string): Promise<PublicVerificationResponse> {
+    if (token.startsWith('preview-')) {
+      const regNo = token.replace('preview-', '');
+      const report = await this.reportRepository.findOne({
+        where: { registrationNumber: regNo },
+        relations: ['patient'],
+      });
+      if (report) {
+        return {
+          verified: false,
+          status: 'INVALID',
+          registrationNumber: report.registrationNumber,
+          registeredAt: report.registeredAt,
+          destinationCountry: report.patient?.country,
+          agency: report.patient?.agency,
+          issuingOrganization: 'MYSA Medical Center',
+          message: 'This medical report is currently in DRAFT status and has not been officially finalized or certified yet.',
+        };
+      }
+    }
+
     const tokenRecord = await this.tokenRepository.findOne({
       where: { token },
       relations: ['report', 'report.patient'],

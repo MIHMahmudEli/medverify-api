@@ -114,11 +114,15 @@ export class PdfService {
         // Generate QR Code if verification token exists or generate preview URL
         let qrBuffer: Buffer | null = null;
         let qrUrl = '';
-        const activeToken = await this.verificationService.getActiveTokenForReport(report.id);
+        let activeToken = await this.verificationService.getActiveTokenForReport(report.id);
+        if (!activeToken && report.status === 'FINALIZED') {
+          activeToken = await this.verificationService.createTokenForReport(report.id);
+        }
+
         if (activeToken && !activeToken.isRevoked) {
           qrUrl = this.verificationService.getVerificationUrl(activeToken.token);
         } else {
-          qrUrl = `https://medverify.org/verify/preview-${report.registrationNumber}`;
+          qrUrl = this.verificationService.getPreviewVerificationUrl(report.registrationNumber);
         }
 
         try {

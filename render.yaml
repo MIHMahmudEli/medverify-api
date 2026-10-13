@@ -14,8 +14,8 @@ services:
       - key: AUTH_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        sync: false
+        value: https://medverify-zeta.vercel.app
       - key: QR_VERIFICATION_BASE_URL
-        sync: false
+        value: https://medverify-zeta.vercel.app/verify
       - key: TYPEORM_SYNCHRONIZE
         value: "false"
