@@ -22,7 +22,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Uploads & Generated files
-uploads/
+/uploads/
 storage/
 temp/
 *.pdf
