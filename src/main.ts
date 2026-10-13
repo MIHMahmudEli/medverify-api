@@ -59,9 +59,9 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   });
 
-  // REST API prefix with health check exclusion for cloud orchestrators (Render / Kubernetes)
+  // REST API prefix with health check and root exclusion
   app.setGlobalPrefix('api/v1', {
-    exclude: ['health', 'health/(.*)'],
+    exclude: ['health', 'health/(.*)', '', '/'],
   });
 
   // Global validation pipeline
