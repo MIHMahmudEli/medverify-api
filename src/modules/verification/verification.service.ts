@@ -12,7 +12,7 @@ import { ConfigService } from '@nestjs/config';
 
 export interface PublicVerificationResponse {
   verified: boolean;
-  status: 'VALID' | 'REVOKED' | 'SUPERSEDED' | 'INVALID';
+  status: 'VALID' | 'REVOKED' | 'SUPERSEDED' | 'INVALID' | 'DRAFT';
   message?: string;
   registrationNumber?: string;
   registeredAt?: string;
@@ -97,15 +97,23 @@ export class VerificationService {
         relations: ['patient'],
       });
       if (report) {
+        const rawName = report.patient?.fullName || '';
+        const nameParts = rawName.trim().split(/\s+/);
+        const maskedInitials = nameParts
+          .map((part) => (part.length > 0 ? `${part[0]}***` : ''))
+          .join(' ');
+
         return {
           verified: false,
-          status: 'INVALID',
+          status: 'DRAFT',
           registrationNumber: report.registrationNumber,
           registeredAt: report.registeredAt,
+          finalMedicalStatus: report.finalMedicalStatus || 'DRAFT',
+          patientInitials: maskedInitials,
           destinationCountry: report.patient?.country,
           agency: report.patient?.agency,
           issuingOrganization: 'MYSA Medical Center',
-          message: 'This medical report is currently in DRAFT status and has not been officially finalized or certified yet.',
+          message: 'This medical examination report is currently in DRAFT status and has not been officially finalized or certified yet.',
         };
       }
     }
