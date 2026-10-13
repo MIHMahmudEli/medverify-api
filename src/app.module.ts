@@ -17,6 +17,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
         limit: 120, // 120 requests per minute
       },
     ]),
+    HealthModule,
     AuthModule,
     UsersModule,
     PatientsModule,

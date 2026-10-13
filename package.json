@@ -18,7 +18,11 @@
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
-    "seed": "ts-node -r tsconfig-paths/register ./src/database/seeds/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register ./src/database/seeds/seed.ts",
+    "seed:prod": "node dist/database/seeds/seed.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.8",

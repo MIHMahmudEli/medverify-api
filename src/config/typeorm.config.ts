@@ -34,7 +34,7 @@ export const typeOrmModuleOptions: TypeOrmModuleOptions = {
     rejectUnauthorized: false,
   },
   entities: entityList,
-  synchronize: config.nodeEnv === 'development',
+  synchronize: process.env.TYPEORM_SYNCHRONIZE === 'true' || config.nodeEnv === 'development',
   logging: config.nodeEnv === 'development' ? ['error', 'warn'] : ['error'],
   extra: {
     max: 10,

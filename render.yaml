@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: medverify-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: QR_VERIFICATION_BASE_URL
+        sync: false
+      - key: TYPEORM_SYNCHRONIZE
+        value: "false"
