@@ -372,7 +372,7 @@ export class ReportsService {
     const report = await this.findOne(id);
     let cert = await this.certificateRepository.findOne({
       where: { reportId: report.id, status: CertificateStatus.ACTIVE },
-      relations: ['authorizedSignatory', 'report', 'patient'],
+      relations: ['issuedBy', 'report', 'patient'],
     });
 
     if (!cert && report.status === ReportStatus.FINALIZED) {

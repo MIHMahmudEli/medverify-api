@@ -47,8 +47,14 @@ export class PdfService {
 
   /**
    * Resolves an image path from either user uploads or fallback assets.
+  /**
+   * Resolves image either from local disk cache or dynamically fetches from Supabase Storage CDN.
+   * Returns a file path string or a memory Buffer.
    */
-  private resolveImagePath(imageRef?: string, defaultFileName?: string): string | null {
+  private async resolveImageBuffer(
+    imageRef?: string,
+    defaultFileName?: string,
+  ): Promise<string | Buffer | null> {
     if (imageRef) {
       let cleanFilename = imageRef;
       if (cleanFilename.includes('/object/public/medverify/')) {
@@ -64,6 +70,7 @@ export class PdfService {
       }
       cleanFilename = cleanFilename.replace(/^\//, '').split('?')[0];
 
+      // 1. Check local candidates on disk
       const candidates = [
         join(process.cwd(), 'uploads', cleanFilename),
         join(process.cwd(), 'assets', cleanFilename),
@@ -80,11 +87,47 @@ export class PdfService {
         if (fs.existsSync(c)) return c;
       }
 
-      if (fs.existsSync(imageRef)) {
-        return imageRef;
+      // 2. Fetch from direct remote URL (Supabase Storage / HTTP)
+      if (imageRef.startsWith('http://') || imageRef.startsWith('https://')) {
+        try {
+          const res = await fetch(imageRef);
+          if (res.ok) {
+            const arrayBuf = await res.arrayBuffer();
+            const buf = Buffer.from(arrayBuf);
+            try {
+              const uDir = join(process.cwd(), 'uploads');
+              if (!fs.existsSync(uDir)) fs.mkdirSync(uDir, { recursive: true });
+              fs.writeFileSync(join(uDir, cleanFilename), buf);
+            } catch {}
+            return buf;
+          }
+        } catch (fetchErr: any) {
+          console.warn(`[PdfService] Failed to download image from ${imageRef}: ${fetchErr.message}`);
+        }
+      }
+
+      // 3. Construct Supabase CDN URL for this filename if not found locally
+      const supabaseUrl = process.env.SUPABASE_URL || 'https://lfllressuzifwyxmevdr.supabase.co';
+      const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'medverify';
+      if (cleanFilename) {
+        try {
+          const cdnUrl = `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/${bucket}/${cleanFilename}`;
+          const res = await fetch(cdnUrl);
+          if (res.ok) {
+            const arrayBuf = await res.arrayBuffer();
+            const buf = Buffer.from(arrayBuf);
+            try {
+              const uDir = join(process.cwd(), 'uploads');
+              if (!fs.existsSync(uDir)) fs.mkdirSync(uDir, { recursive: true });
+              fs.writeFileSync(join(uDir, cleanFilename), buf);
+            } catch {}
+            return buf;
+          }
+        } catch {}
       }
     }
 
+    // 4. Default image fallback
     if (defaultFileName) {
       const candidates = [
         join(process.cwd(), 'uploads', defaultFileName),
@@ -133,7 +176,7 @@ export class PdfService {
   /**
    * Renders PAGE 1: Official Medical Fitness Certificate
    */
-  public renderCertificatePage(
+  public async renderCertificatePage(
     doc: any,
     certificate: MedicalCertificate,
     report: MedicalReport,
@@ -278,7 +321,8 @@ export class PdfService {
 
     // Patient Photo
     const photoBoxX = 42 + detailsW;
-    const photoPath = this.resolveImagePath(safePatient.photoUrl, 'default_photo.png');
+    const photoCandidate = safePatient.photoUrl || (report.registrationNumber ? `photo_${report.registrationNumber}.png` : undefined);
+    const photoPath = await this.resolveImageBuffer(photoCandidate, 'default_photo.png');
     if (photoPath) {
       try {
         doc.image(photoPath, photoBoxX + 3, pBoxY + 3, {
@@ -415,7 +459,7 @@ export class PdfService {
     doc.text('AUTHORIZED MEDICAL SIGNATORY & SEAL', rightAuthX, authY + 5.5, { align: 'center', width: rightAuthW });
 
     // Signature Graphic
-    const sigPath = this.resolveImagePath(settings?.signatorySignatureUrl, 'doctor_signature.png');
+    const sigPath = await this.resolveImageBuffer(settings?.signatorySignatureUrl, 'doctor_signature.png');
     if (sigPath) {
       try {
         doc.image(sigPath, rightAuthX + (rightAuthW - 130) / 2, authY + 28, { fit: [130, 48], align: 'center' });
@@ -439,7 +483,7 @@ export class PdfService {
     doc.text('Official Clinical Director & Authorized Examiner', rightAuthX + 15, authY + 118, { align: 'center', width: rightAuthW - 30 });
 
     // Official Clinic Stamp & Seal
-    const stampPath = this.resolveImagePath(undefined, 'official_stamp.png');
+    const stampPath = await this.resolveImageBuffer(undefined, 'official_stamp.png');
     if (stampPath) {
       try {
         doc.image(stampPath, rightAuthX + (rightAuthW - 48) / 2, authY + 128, {
@@ -475,7 +519,7 @@ export class PdfService {
   /**
    * Renders PAGE 2: Detailed Medical Test Report (matches reference PDF layout)
    */
-  public renderReportPage(
+  public async renderReportPage(
     doc: any,
     report: MedicalReport,
     patient: Patient,
@@ -491,7 +535,7 @@ export class PdfService {
     const age = safePatient.dateOfBirth ? this.calculateAge(safePatient.dateOfBirth) : 'N/A';
 
     // --- 1. TOP HEADER BANNER ---
-    const bannerPath = this.resolveImagePath(undefined, 'header_banner.png');
+    const bannerPath = await this.resolveImageBuffer(undefined, 'header_banner.png');
     if (bannerPath) {
       doc.image(bannerPath, 28.5, 28.5, { width: 538.75, height: 47.73 });
     } else {
@@ -571,7 +615,8 @@ export class PdfService {
     });
 
     doc.rect(photoBoxX, pTableY, photoBoxW, photoBoxH).stroke();
-    const photoPath = this.resolveImagePath(safePatient.photoUrl, 'default_photo.png');
+    const photoCandidate = safePatient.photoUrl || (report.registrationNumber ? `photo_${report.registrationNumber}.png` : undefined);
+    const photoPath = await this.resolveImageBuffer(photoCandidate, 'default_photo.png');
     if (photoPath) {
       try {
         doc.image(photoPath, photoBoxX + 2, pTableY + 2, {
@@ -756,7 +801,8 @@ export class PdfService {
     doc.lineWidth(0.6).strokeColor('#212529');
     doc.rect(xrayBoxX, xrayBoxY, xrayBoxW, xrayBoxH).stroke();
 
-    const xrayPath = this.resolveImagePath(report.xrayImageUrl, 'default_xray.png');
+    const xrayCandidate = report.xrayImageUrl || (report.registrationNumber ? `xray_${report.registrationNumber}.png` : undefined);
+    const xrayPath = await this.resolveImageBuffer(xrayCandidate, 'default_xray.png');
     if (xrayPath) {
       try {
         doc.image(xrayPath, xrayBoxX + 1, xrayBoxY + 1, {
@@ -845,7 +891,7 @@ export class PdfService {
         }
 
         // --- PAGE 1: Medical Fitness Certificate ---
-        this.renderCertificatePage(doc, certificate, report, patient, settings, {
+        await this.renderCertificatePage(doc, certificate, report, patient, settings, {
           pageNumber: 1,
           totalPages: 2,
           qrUrl,
@@ -859,7 +905,7 @@ export class PdfService {
         });
 
         // --- PAGE 2: Detailed Medical Test Report ---
-        this.renderReportPage(doc, report, patient, {
+        await this.renderReportPage(doc, report, patient, {
           pageNumber: 2,
           totalPages: 2,
           qrUrl,
@@ -907,7 +953,7 @@ export class PdfService {
           qrBuffer = null;
         }
 
-        this.renderCertificatePage(doc, certificate, report, patient, settings, {
+        await this.renderCertificatePage(doc, certificate, report, patient, settings, {
           pageNumber: 1,
           totalPages: 1,
           qrUrl,
@@ -961,7 +1007,7 @@ export class PdfService {
           qrBuffer = null;
         }
 
-        this.renderReportPage(doc, report, patient, {
+        await this.renderReportPage(doc, report, patient, {
           pageNumber: 1,
           totalPages: 1,
           qrUrl,
