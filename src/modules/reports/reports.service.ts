@@ -22,6 +22,7 @@ import {
   MedicalCertificate,
   CertificateStatus,
 } from '../../database/entities/medical-certificate.entity';
+import { OrganizationSettings } from '../../database/entities/organization-settings.entity';
 import {
   CreateReportDto,
   UpdateReportDto,
@@ -42,6 +43,8 @@ export class ReportsService {
     private patientRepository: Repository<Patient>,
     @InjectRepository(MedicalCertificate)
     private certificateRepository: Repository<MedicalCertificate>,
+    @InjectRepository(OrganizationSettings)
+    private settingsRepository: Repository<OrganizationSettings>,
     private templatesService: TemplatesService,
     private verificationService: VerificationService,
     private pdfService: PdfService,
@@ -362,6 +365,48 @@ export class ReportsService {
     const report = await this.findOne(id);
     const buffer = await this.pdfService.generateReportPdf(report, report.patient);
     const filename = `MedVerify_${report.registrationNumber}_${report.patient.passportNumber}.pdf`;
+    return { buffer, filename };
+  }
+
+  async getCombinedPrintPdf(id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const report = await this.findOne(id);
+    let cert = await this.certificateRepository.findOne({
+      where: { reportId: report.id, status: CertificateStatus.ACTIVE },
+      relations: ['authorizedSignatory', 'report', 'patient'],
+    });
+
+    if (!cert && report.status === ReportStatus.FINALIZED) {
+      const systemAdminId = report.finalizedById || report.createdById;
+      const certCount = await this.certificateRepository.count();
+      const seq = String(certCount + 1).padStart(5, '0');
+      const year = new Date().getFullYear();
+      const newCert = this.certificateRepository.create({
+        reportId: report.id,
+        patientId: report.patientId,
+        certificateNumber: `MC-${year}-${seq}`,
+        verificationToken: require('crypto').randomBytes(24).toString('hex'),
+        status: CertificateStatus.ACTIVE,
+        issuedAt: new Date(),
+        issuedById: systemAdminId,
+      });
+      cert = await this.certificateRepository.save(newCert);
+    }
+
+    const settings = await this.settingsRepository.findOne({ where: {} });
+    let buffer: Buffer;
+    if (cert) {
+      buffer = await this.pdfService.generateCombinedPdf(
+        cert,
+        report,
+        report.patient,
+        settings || undefined,
+      );
+    } else {
+      buffer = await this.pdfService.generateReportPdf(report, report.patient);
+    }
+
+    const safeReg = report.registrationNumber.replace(/[^a-zA-Z0-9_-]/g, '');
+    const filename = `Official_Medical_Record_${safeReg}.pdf`;
     return { buffer, filename };
   }
 }

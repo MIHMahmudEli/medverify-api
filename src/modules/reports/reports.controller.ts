@@ -159,4 +159,27 @@ export class ReportsController {
 
     res.end(buffer);
   }
+
+  @ApiOperation({ summary: 'Download or preview combined 2-Page Certificate and Report PDF' })
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.DOCTOR,
+    UserRole.LAB_TECHNICIAN,
+    UserRole.REPORT_OPERATOR,
+    UserRole.VIEWER,
+  )
+  @Get(':id/print-pdf')
+  async getCombinedPdf(@Param('id') id: string, @Res() res: Response) {
+    const { buffer, filename } = await this.reportsService.getCombinedPrintPdf(id);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'Content-Length': buffer.length,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    });
+
+    res.end(buffer);
+  }
 }

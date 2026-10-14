@@ -56,19 +56,21 @@ export class PdfService {
           ? imageRef.split('/uploads/')[1]
           : imageRef.replace(/^\//, '');
 
-      const candidateUpload = join(process.cwd(), 'uploads', cleanFilename);
-      if (fs.existsSync(candidateUpload)) {
-        return candidateUpload;
+      const candidates = [
+        join(process.cwd(), 'uploads', cleanFilename),
+        join(process.cwd(), 'assets', cleanFilename),
+        join(process.cwd(), 'medverify-api', 'assets', cleanFilename),
+        join(process.cwd(), 'dist', 'assets', cleanFilename),
+        join(__dirname, 'assets', cleanFilename),
+        join(__dirname, '../assets', cleanFilename),
+        join(__dirname, '../../assets', cleanFilename),
+        join(__dirname, '../../../assets', cleanFilename),
+        join(__dirname, '../../../../assets', cleanFilename),
+      ];
+
+      for (const c of candidates) {
+        if (fs.existsSync(c)) return c;
       }
-
-      const candidateAsset1 = join(process.cwd(), 'assets', cleanFilename);
-      if (fs.existsSync(candidateAsset1)) return candidateAsset1;
-
-      const candidateAsset2 = join(__dirname, '../../../../assets', cleanFilename);
-      if (fs.existsSync(candidateAsset2)) return candidateAsset2;
-
-      const candidateAsset3 = join(__dirname, '../../../assets', cleanFilename);
-      if (fs.existsSync(candidateAsset3)) return candidateAsset3;
 
       if (fs.existsSync(imageRef)) {
         return imageRef;
@@ -76,14 +78,21 @@ export class PdfService {
     }
 
     if (defaultFileName) {
-      const candidateAsset1 = join(process.cwd(), 'assets', defaultFileName);
-      if (fs.existsSync(candidateAsset1)) return candidateAsset1;
+      const candidates = [
+        join(process.cwd(), 'uploads', defaultFileName),
+        join(process.cwd(), 'assets', defaultFileName),
+        join(process.cwd(), 'medverify-api', 'assets', defaultFileName),
+        join(process.cwd(), 'dist', 'assets', defaultFileName),
+        join(__dirname, 'assets', defaultFileName),
+        join(__dirname, '../assets', defaultFileName),
+        join(__dirname, '../../assets', defaultFileName),
+        join(__dirname, '../../../assets', defaultFileName),
+        join(__dirname, '../../../../assets', defaultFileName),
+      ];
 
-      const candidateAsset2 = join(__dirname, '../../../../assets', defaultFileName);
-      if (fs.existsSync(candidateAsset2)) return candidateAsset2;
-
-      const candidateAsset3 = join(__dirname, '../../../assets', defaultFileName);
-      if (fs.existsSync(candidateAsset3)) return candidateAsset3;
+      for (const c of candidates) {
+        if (fs.existsSync(c)) return c;
+      }
     }
 
     return null;

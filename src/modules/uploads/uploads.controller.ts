@@ -74,15 +74,23 @@ export class UploadsController {
   serveFile(@Param('filename') filename: string, @Res() res: Response) {
     // Sanitize filename to prevent directory traversal
     const safeFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '');
-    const filePath = join(uploadDir, safeFilename);
 
-    if (fs.existsSync(filePath)) {
-      return res.sendFile(filePath);
-    }
+    const candidatePaths = [
+      join(uploadDir, safeFilename),
+      join(process.cwd(), 'assets', safeFilename),
+      join(process.cwd(), 'medverify-api', 'assets', safeFilename),
+      join(process.cwd(), 'dist', 'assets', safeFilename),
+      join(__dirname, 'assets', safeFilename),
+      join(__dirname, '../assets', safeFilename),
+      join(__dirname, '../../assets', safeFilename),
+      join(__dirname, '../../../assets', safeFilename),
+      join(__dirname, '../../../../assets', safeFilename),
+    ];
 
-    const assetPath = join(process.cwd(), 'assets', safeFilename);
-    if (fs.existsSync(assetPath)) {
-      return res.sendFile(assetPath);
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        return res.sendFile(p);
+      }
     }
 
     throw new NotFoundException('File not found');
