@@ -107,4 +107,29 @@ export class UsersService {
     await this.userRepository.save(user);
     return { success: true, message: `User ${user.email} deactivated` };
   }
+
+  async resetPassword(
+    id: string,
+    customTempPassword?: string,
+  ): Promise<{ temporaryPassword: string; message: string; user: { id: string; fullName: string; email: string } }> {
+    const user = await this.findOne(id);
+
+    const tempPassword =
+      customTempPassword && customTempPassword.trim().length >= 6
+        ? customTempPassword.trim()
+        : `Temp@${Math.random().toString(36).slice(-5).toUpperCase()}${Math.floor(100 + Math.random() * 900)}!`;
+
+    user.passwordHash = await argon2.hash(tempPassword);
+    await this.userRepository.save(user);
+
+    return {
+      temporaryPassword: tempPassword,
+      message: `Temporary password created successfully.`,
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+      },
+    };
+  }
 }

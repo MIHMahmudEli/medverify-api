@@ -109,4 +109,33 @@ export class AuthService {
 
     return user;
   }
+
+  async changePassword(userId: string, currentPass: string, newPass: string) {
+    if (!newPass || newPass.trim().length < 6) {
+      throw new BadRequestException('New password must be at least 6 characters long');
+    }
+
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.id = :id', { id: userId })
+      .getOne();
+
+    if (!user) {
+      throw new UnauthorizedException('User account not found');
+    }
+
+    const isCurrentValid = await argon2.verify(user.passwordHash, currentPass);
+    if (!isCurrentValid) {
+      throw new BadRequestException('Current password does not match. Please verify and try again.');
+    }
+
+    user.passwordHash = await argon2.hash(newPass.trim());
+    await this.userRepository.save(user);
+
+    return {
+      success: true,
+      message: 'Your account password has been updated successfully.',
+    };
+  }
 }

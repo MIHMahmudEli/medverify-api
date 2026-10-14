@@ -59,4 +59,14 @@ export class UsersController {
   async remove(@Param('id') id: string) {
     return this.usersService.remove(id);
   }
+
+  @ApiOperation({ summary: 'Reset user password and restore a temporary password' })
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @Post(':id/reset-password')
+  async resetPassword(
+    @Param('id') id: string,
+    @Body() body?: { temporaryPassword?: string },
+  ) {
+    return this.usersService.resetPassword(id, body?.temporaryPassword);
+  }
 }
