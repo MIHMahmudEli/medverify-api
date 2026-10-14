@@ -144,6 +144,24 @@ export class PdfService {
       for (const c of candidates) {
         if (fs.existsSync(c)) return c;
       }
+
+      // Fetch default image from Supabase Storage CDN if not on local disk
+      const supabaseUrl = process.env.SUPABASE_URL || 'https://lfllressuzifwyxmevdr.supabase.co';
+      const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'medverify';
+      try {
+        const cdnUrl = `${supabaseUrl.replace(/\/+$/, '')}/storage/v1/object/public/${bucket}/${defaultFileName}`;
+        const res = await fetch(cdnUrl);
+        if (res.ok) {
+          const arrayBuf = await res.arrayBuffer();
+          const buf = Buffer.from(arrayBuf);
+          try {
+            const uDir = join(process.cwd(), 'uploads');
+            if (!fs.existsSync(uDir)) fs.mkdirSync(uDir, { recursive: true });
+            fs.writeFileSync(join(uDir, defaultFileName), buf);
+          } catch {}
+          return buf;
+        }
+      } catch {}
     }
 
     return null;
