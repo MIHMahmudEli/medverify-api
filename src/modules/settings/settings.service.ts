@@ -23,7 +23,7 @@ export class SettingsService implements OnModuleInit {
         orgName: 'MYSA Medical Center',
         orgCode: 'MMS',
         orgAddress: 'Diagnostic & Medical Checkup Centre for Overseas Employment',
-        orgAddressLine2: 'VIP Road, Dhaka-1000',
+        orgAddressLine2: '',
         orgPhone: '+880 1700-000000',
         orgEmail: 'info@mysamedicalbd.com',
         reportHeaderTitle: 'MEDICAL TEST REPORT',

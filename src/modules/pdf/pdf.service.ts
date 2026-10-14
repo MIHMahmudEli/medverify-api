@@ -206,7 +206,7 @@ export class PdfService {
     settings?: OrganizationSettings,
     opts: PdfRenderOptions = {},
   ) {
-    const orgName = settings?.orgName || 'MYSA MEDICAL SERVICES (PVT.) LTD.';
+    const orgName = settings?.orgName || 'MYSA Medical Center';
     const orgAddress =
       settings?.orgAddress ||
       'Diagnostic & Medical Checkup Centre for Overseas Employment';
@@ -553,11 +553,12 @@ export class PdfService {
     width: number = 538.75,
     height: number = 47.73,
   ): Promise<void> {
-    const orgName = (settings?.orgName || 'MYSA MEDICAL SERVICES (PVT.) LTD.').toUpperCase();
-    const orgCode = (settings?.orgCode || 'MMS').toLowerCase();
+    const orgName = (settings?.orgName || 'MYSA Medical Center').toUpperCase();
+    const orgCode = (settings?.orgCode || 'MMS').toUpperCase();
     const addr1 = settings?.orgAddress || 'Diagnostic & Medical Checkup Centre for Overseas Employment';
-    const addr2 = settings?.orgAddressLine2 || 'VIP Road, Dhaka-1000';
+    const addr2 = settings?.orgAddressLine2?.trim() || '';
     const phone = settings?.orgPhone || '+880 1700-000000';
+    const email = settings?.orgEmail || '';
 
     // 1. Check for custom uploaded clinic logo
     let customLogoDrawn = false;
@@ -565,7 +566,7 @@ export class PdfService {
       try {
         const logoBuffer = await this.resolveImageBuffer(settings.logoUrl);
         if (logoBuffer) {
-          doc.image(logoBuffer, x + 2, y + 4, { fit: [48, 40], align: 'center', valign: 'center' });
+          doc.image(logoBuffer, x + 2, y + 3, { fit: [46, 42], align: 'center', valign: 'center' });
           customLogoDrawn = true;
         }
       } catch (err) {
@@ -573,48 +574,46 @@ export class PdfService {
       }
     }
 
-    // 2. If no custom logo, draw crisp vector medical emblem with heartbeat pulse and orgCode
+    // 2. If no custom logo, draw crisp vector clinical emblem with medical cross & orgCode
     if (!customLogoDrawn) {
       doc.save();
-      // ECG / pulse wave in clinical deep burgundy
-      doc.lineWidth(1.3).strokeColor('#881337');
-      doc.moveTo(x + 1, y + 23)
-        .lineTo(x + 7, y + 23)
-        .lineTo(x + 11, y + 14)
-        .lineTo(x + 15, y + 33)
-        .lineTo(x + 19, y + 19)
-        .lineTo(x + 23, y + 23)
-        .lineTo(x + 26, y + 23)
+      // Clinical emblem container badge
+      doc.roundedRect(x + 2, y + 2, 42, 42, 6).lineWidth(1).strokeColor('#cbd5e1').fillAndStroke('#f8fafc', '#0f2942');
+
+      // Medical cross in clinical cyan/teal
+      doc.roundedRect(x + 19.5, y + 7, 7, 19, 1.5).fill('#0284c7');
+      doc.roundedRect(x + 13.5, y + 13, 19, 7, 1.5).fill('#0284c7');
+
+      // Vital ECG pulse line across the cross
+      doc.lineWidth(1.2).strokeColor('#e11d48');
+      doc.moveTo(x + 8, y + 16.5)
+        .lineTo(x + 15, y + 16.5)
+        .lineTo(x + 18, y + 10)
+        .lineTo(x + 22, y + 23)
+        .lineTo(x + 25, y + 13)
+        .lineTo(x + 28, y + 16.5)
+        .lineTo(x + 38, y + 16.5)
         .stroke();
 
-      // Stylized caring human heads
-      doc.circle(x + 35, y + 13, 2.6).fill('#0284c7');
-      doc.circle(x + 43, y + 10, 2.9).fill('#0369a1');
-
-      // Heart contour in medical teal/cyan
-      doc.lineWidth(1.8).strokeColor('#0284c7');
-      doc.moveTo(x + 35, y + 18).bezierCurveTo(x + 27, y + 18, x + 26, y + 27, x + 37, y + 34).stroke();
-      doc.moveTo(x + 43, y + 15).bezierCurveTo(x + 52, y + 15, x + 53, y + 24, x + 37, y + 34).stroke();
-
-      // Prefix Code in deep navy
-      doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#000066');
-      doc.text(orgCode, x + 19, y + 34.5, { width: 36, align: 'center' });
+      // Prefix Code in deep navy below cross
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#0f2942');
+      doc.text(orgCode, x + 2, y + 32, { width: 42, align: 'center' });
       doc.restore();
     }
 
     // 3. Organization Name Area
-    const nameX = x + 58;
-    const divX = x + 310;
-    const nameW = divX - nameX - 10;
+    const nameX = x + 52;
+    const divX = x + 305;
+    const nameW = divX - nameX - 8;
 
-    let nameFontSize = 13.5;
-    if (orgName.length > 34) {
-      nameFontSize = 11.5;
-    } else if (orgName.length > 24) {
-      nameFontSize = 12.5;
+    let nameFontSize = 13;
+    if (orgName.length > 38) {
+      nameFontSize = 10.5;
+    } else if (orgName.length > 26) {
+      nameFontSize = 11.8;
     }
 
-    doc.font('Helvetica-Bold').fontSize(nameFontSize).fillColor('#1c2d42');
+    doc.font('Helvetica-Bold').fontSize(nameFontSize).fillColor('#0f2942');
     doc.text(orgName, nameX, y + 9, {
       width: nameW,
       align: 'left',
@@ -622,35 +621,56 @@ export class PdfService {
     });
 
     // 4. Vertical divider bar
-    doc.lineWidth(1.2).strokeColor('#000066').moveTo(divX, y + 3).lineTo(divX, y + height - 3).stroke();
+    doc.lineWidth(1.2).strokeColor('#0f2942').moveTo(divX, y + 3).lineTo(divX, y + height - 3).stroke();
 
     // 5. Right-hand Address & Contact Block
-    const detailsX = divX + 10;
+    const detailsX = divX + 9;
     const detailsW = (x + width) - detailsX;
 
-    doc.font('Helvetica-Bold').fontSize(8.2).fillColor('#000066');
-    doc.text(addr1, detailsX, y + 4.5, {
-      width: detailsW,
-      align: 'left',
-      lineBreak: false,
-      ellipsis: true,
-    });
+    if (addr2) {
+      // 3-line layout
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f2942');
+      doc.text(addr1, detailsX, y + 4.5, {
+        width: detailsW,
+        align: 'left',
+        lineBreak: false,
+        ellipsis: true,
+      });
 
-    doc.font('Helvetica').fontSize(7.8).fillColor('#000066');
-    doc.text(addr2, detailsX, y + 17.5, {
-      width: detailsW,
-      align: 'left',
-      lineBreak: false,
-      ellipsis: true,
-    });
+      doc.font('Helvetica').fontSize(7.5).fillColor('#334155');
+      doc.text(addr2, detailsX, y + 17.5, {
+        width: detailsW,
+        align: 'left',
+        lineBreak: false,
+        ellipsis: true,
+      });
 
-    doc.font('Helvetica-Bold').fontSize(7.8).fillColor('#000066');
-    doc.text(`Mobile No.: ${phone}`, detailsX, y + 30.5, {
-      width: detailsW,
-      align: 'left',
-      lineBreak: false,
-      ellipsis: true,
-    });
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#0f2942');
+      doc.text(`Mobile No.: ${phone}`, detailsX, y + 30.5, {
+        width: detailsW,
+        align: 'left',
+        lineBreak: false,
+        ellipsis: true,
+      });
+    } else {
+      // 2-line layout (cleaner when no secondary address)
+      doc.font('Helvetica-Bold').fontSize(8.2).fillColor('#0f2942');
+      doc.text(addr1, detailsX, y + 8, {
+        width: detailsW,
+        align: 'left',
+        lineBreak: false,
+        ellipsis: true,
+      });
+
+      doc.font('Helvetica-Bold').fontSize(7.8).fillColor('#0f2942');
+      const contactText = email ? `Mobile: ${phone} | Email: ${email}` : `Mobile No.: ${phone}`;
+      doc.text(contactText, detailsX, y + 23.5, {
+        width: detailsW,
+        align: 'left',
+        lineBreak: false,
+        ellipsis: true,
+      });
+    }
   }
 
   /**

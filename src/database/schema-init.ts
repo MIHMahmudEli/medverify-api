@@ -30,7 +30,7 @@ export async function ensureSchema(dataSource: DataSource) {
     // 2. Add columns to organization_settings if they don't exist
     await dataSource.query(`
       ALTER TABLE organization_settings
-      ADD COLUMN IF NOT EXISTS "orgAddressLine2" text DEFAULT 'VIP Road, Dhaka-1000',
+      ADD COLUMN IF NOT EXISTS "orgAddressLine2" text,
       ADD COLUMN IF NOT EXISTS "certificateTitle" varchar(255) DEFAULT 'MEDICAL FITNESS CERTIFICATE',
       ADD COLUMN IF NOT EXISTS "certificateNumberPrefix" varchar(50) DEFAULT 'MC',
       ADD COLUMN IF NOT EXISTS "signatoryName" varchar(255) DEFAULT 'Dr. A. K. M. Shamsuddin',
@@ -42,6 +42,19 @@ export async function ensureSchema(dataSource: DataSource) {
       ADD COLUMN IF NOT EXISTS "certificateFields" jsonb DEFAULT '{"showPassport": true, "showDob": true, "showNationality": true, "showDestination": true, "showDoctorDetails": true}'::jsonb,
       ADD COLUMN IF NOT EXISTS "publicDisclosure" jsonb DEFAULT '{"patientNameMode": "INITIALS", "showPassport": false, "showDob": false, "showNationality": true, "showDestination": true, "showDetailedReport": false, "allowedReportSections": ["physical", "systemic", "lab", "xray"], "allowPublicDownload": true, "allowPublicPrint": true}'::jsonb;
     `);
+
+    // Clean up any legacy static banner fallbacks from database
+    await dataSource.query(`
+      DO $$
+      BEGIN
+        BEGIN
+          ALTER TABLE organization_settings ALTER COLUMN "orgAddressLine2" DROP DEFAULT;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+      END $$;
+      UPDATE organization_settings SET "orgAddressLine2" = NULL WHERE "orgAddressLine2" = 'VIP Road, Dhaka-1000';
+      UPDATE organization_settings SET "orgName" = 'MYSA Medical Center' WHERE "orgName" = 'MYSA MEDICAL SERVICES (PVT.) LTD.';
+    `).catch(() => {});
 
     // 3. Create indices on medical_certificates
     await dataSource.query(`
