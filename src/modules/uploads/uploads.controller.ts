@@ -76,10 +76,15 @@ export class UploadsController {
     const safeFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '');
     const filePath = join(uploadDir, safeFilename);
 
-    if (!fs.existsSync(filePath)) {
-      throw new NotFoundException('File not found');
+    if (fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
     }
 
-    return res.sendFile(filePath);
+    const assetPath = join(process.cwd(), 'assets', safeFilename);
+    if (fs.existsSync(assetPath)) {
+      return res.sendFile(assetPath);
+    }
+
+    throw new NotFoundException('File not found');
   }
 }

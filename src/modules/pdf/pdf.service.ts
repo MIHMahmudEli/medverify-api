@@ -54,12 +54,21 @@ export class PdfService {
         ? imageRef.split('/uploads/file/')[1]
         : imageRef.includes('/uploads/')
           ? imageRef.split('/uploads/')[1]
-          : imageRef;
+          : imageRef.replace(/^\//, '');
 
       const candidateUpload = join(process.cwd(), 'uploads', cleanFilename);
       if (fs.existsSync(candidateUpload)) {
         return candidateUpload;
       }
+
+      const candidateAsset1 = join(process.cwd(), 'assets', cleanFilename);
+      if (fs.existsSync(candidateAsset1)) return candidateAsset1;
+
+      const candidateAsset2 = join(__dirname, '../../../../assets', cleanFilename);
+      if (fs.existsSync(candidateAsset2)) return candidateAsset2;
+
+      const candidateAsset3 = join(__dirname, '../../../assets', cleanFilename);
+      if (fs.existsSync(candidateAsset3)) return candidateAsset3;
 
       if (fs.existsSync(imageRef)) {
         return imageRef;
@@ -522,7 +531,7 @@ export class PdfService {
       ['MARITAL STATUS', safePatient.maritalStatus || 'Unmarried', 'RELIGION', safePatient.religion || 'Islam'],
       ['AGE', age, 'GENDER', safePatient.gender || 'Male'],
       ['NATIONALITY', safePatient.nationality || 'Bangladeshi', 'HEIGHT (CM)', safePatient.heightCm ? String(safePatient.heightCm) : ''],
-      ['AGENCY', safePatient.agency || '', 'WEIGHT (KG)', safePatient.weightKg ? String(safePatient.weightKg) : ''],
+      ['AGENCY', safePatient.agency || '', 'WEIGHT (KG)', safePatient.weightKg ? String(parseFloat(String(safePatient.weightKg))) : ''],
     ];
 
     patientRows.forEach((r, idx) => {
@@ -601,7 +610,7 @@ export class PdfService {
       } else {
         doc.fillColor('#212529').font('Helvetica');
       }
-      doc.text(result || 'NAD', leftDividerX, curLY + 3.2, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
+      doc.text(result !== undefined && result !== null ? result : 'NAD', leftDividerX, curLY + 3.2, { width: leftTableW - (leftDividerX - leftTableX), align: 'center' });
       curLY += rowH;
     };
 
@@ -637,14 +646,14 @@ export class PdfService {
     drawRowLeft('HERNIA', data.hernia || 'ABSENT');
     drawRowLeft('VARICOSE VEINS', data.varicose_veins || 'ABSENT');
     drawRowLeft('DEFORMITIES', data.deformities || 'ABSENT');
-    drawRowLeft('SKIN', data.skin || 'NAD');
-    drawRowLeft('C.N.S', data.cns || 'NAD');
+    drawRowLeft('SKIN', data.skin !== undefined ? data.skin : '');
+    drawRowLeft('C.N.S', data.cns !== undefined ? data.cns : '');
     drawRowLeft('EXTREMITIES', data.extremities || 'NAD');
     drawRowLeft('PSYCHIATRY', data.psychiatry || 'NAD');
 
     drawSubHeaderLeft('VENEREAL DISEASE');
     drawRowLeft('SYMPTOMS', data.venereal_symptoms || 'NAD');
-    drawRowLeft('REMARKS', data.exam_remarks || 'NAD');
+    drawRowLeft('REMARKS', data.exam_remarks !== undefined ? data.exam_remarks : '');
 
     drawSubHeaderLeft('X-RAY INVESTIGATION');
     drawRowLeft('CHEST X-RAY', report.xrayFinding || data.chest_xray || 'NORMAL');
@@ -675,7 +684,7 @@ export class PdfService {
       doc.moveTo(rightDividerX, curRY).lineTo(rightDividerX, curRY + customRowH).stroke();
       doc.fillColor('#212529').fontSize(7.5).font('Helvetica');
       doc.text(exam, rightTableX + 5, curRY + (customRowH > rowH ? 5.5 : 3.2), { width: rightDividerX - rightTableX - 10 });
-      doc.text(result || 'N/A', rightDividerX, curRY + (customRowH > rowH ? 5.5 : 3.2), { width: rightTableW - (rightDividerX - rightTableX), align: 'center' });
+      doc.text(result !== undefined && result !== null ? result : '', rightDividerX, curRY + (customRowH > rowH ? 5.5 : 3.2), { width: rightTableW - (rightDividerX - rightTableX), align: 'center' });
       curRY += customRowH;
     };
 
@@ -684,20 +693,20 @@ export class PdfService {
     drawRowRight('URINE FOR PREGNANCY TEST', data.urine_pregnancy || 'N/A');
 
     drawSubHeaderRight('OTHERS');
-    drawRowRight('BLOOD GROUP', data.blood_group || 'O (+VE)');
-    drawRowRight('HAEMOGLOBIN', data.haemoglobin || '14.2');
-    drawRowRight('ESR', data.esr || '12');
+    drawRowRight('BLOOD GROUP', data.blood_group !== undefined ? data.blood_group : '');
+    drawRowRight('HAEMOGLOBIN', data.haemoglobin !== undefined ? data.haemoglobin : '');
+    drawRowRight('ESR', data.esr !== undefined ? data.esr : '');
     drawRowRight('R.B.S', data.rbs || '6.5');
     drawRowRight('S. CREATININE', data.s_creatinine || '1.0');
     drawRowRight('S.BIL', data.s_bil || '0.85');
     drawRowRight('SGPT', data.sgpt || '35');
-    drawRowRight('SGOT', data.sgot || '28');
+    drawRowRight('SGOT', data.sgot !== undefined ? data.sgot : '');
     drawRowRight('HIV I & HIV II', data.hiv || 'NEGATIVE');
     drawRowRight('HBsAg', data.hbsag || 'NEGATIVE');
     drawRowRight('Anti HCV', data.anti_hcv || 'NEGATIVE');
     drawRowRight('TPHA (IF VDRL POSITIVE)', data.tpha || 'NEGATIVE');
     drawRowRight('VDRL', data.vdrl || 'NON REACTIVE');
-    drawRowRight('REMARKS', data.lab_remarks || 'NORMAL');
+    drawRowRight('REMARKS', data.lab_remarks !== undefined ? data.lab_remarks : '');
 
     // --- 6. STATUS, CHEST X-RAY & CRYPTOGRAPHIC QR VERIFICATION SECTION ---
     const isFit = (report.finalMedicalStatus || 'FIT') === 'FIT';

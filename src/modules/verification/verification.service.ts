@@ -350,7 +350,7 @@ export class VerificationService {
       disclosure.patientNameMode === 'FULL' ? rawFullName : maskedInitials;
 
     const displayPassport = disclosure.showPassport
-      ? this.maskPassport(patientRaw?.passportNumber || '')
+      ? (disclosure.patientNameMode === 'FULL' ? patientRaw?.passportNumber : this.maskPassport(patientRaw?.passportNumber || ''))
       : undefined;
 
     const displayDob = disclosure.showDob
