@@ -9,6 +9,7 @@ import {
   NotFoundException,
   Res,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -27,6 +28,8 @@ if (!fs.existsSync(uploadDir)) {
 @ApiTags('Uploads')
 @Controller('uploads')
 export class UploadsController {
+  private readonly logger = new Logger(UploadsController.name);
+
   @ApiOperation({ summary: 'Upload medical image (X-Ray, Fingerprint, Patient Photo)' })
   @ApiConsumes('multipart/form-data')
   @ApiBearerAuth()
@@ -56,10 +59,53 @@ export class UploadsController {
       },
     }),
   )
-  uploadFile(@UploadedFile() file: Express.Multer.File) {
+  async uploadFile(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded or file rejected');
     }
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+    const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'medverify';
+
+    // If Supabase Storage is configured, upload to bucket
+    if (supabaseUrl && supabaseKey) {
+      try {
+        const cleanBaseUrl = supabaseUrl.replace(/\/+$/, '');
+        const uploadEndpoint = `${cleanBaseUrl}/storage/v1/object/${bucket}/${file.filename}`;
+        const fileBuffer = fs.readFileSync(file.path);
+
+        const res = await fetch(uploadEndpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${supabaseKey}`,
+            apikey: supabaseKey,
+            'Content-Type': file.mimetype,
+            'x-upsert': 'true',
+          },
+          body: fileBuffer,
+        });
+
+        if (res.ok) {
+          const publicUrl = `${cleanBaseUrl}/storage/v1/object/public/${bucket}/${file.filename}`;
+          this.logger.log(`Uploaded ${file.filename} to Supabase bucket ${bucket}: ${publicUrl}`);
+          return {
+            filename: file.filename,
+            originalName: file.originalname,
+            size: file.size,
+            mimetype: file.mimetype,
+            url: publicUrl,
+          };
+        } else {
+          const errorText = await res.text();
+          this.logger.error(`Supabase upload failed: ${res.status} - ${errorText}`);
+        }
+      } catch (err: any) {
+        this.logger.error(`Supabase upload error: ${err.message}`);
+      }
+    }
+
+    // Local fallback
     return {
       filename: file.filename,
       originalName: file.originalname,
@@ -91,6 +137,14 @@ export class UploadsController {
       if (fs.existsSync(p)) {
         return res.sendFile(p);
       }
+    }
+
+    // Redirect to Supabase Storage if available
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'medverify';
+    if (supabaseUrl) {
+      const cleanBase = supabaseUrl.replace(/\/+$/, '');
+      return res.redirect(`${cleanBase}/storage/v1/object/public/${bucket}/${safeFilename}`);
     }
 
     throw new NotFoundException('File not found');

@@ -50,11 +50,19 @@ export class PdfService {
    */
   private resolveImagePath(imageRef?: string, defaultFileName?: string): string | null {
     if (imageRef) {
-      const cleanFilename = imageRef.includes('/uploads/file/')
-        ? imageRef.split('/uploads/file/')[1]
-        : imageRef.includes('/uploads/')
-          ? imageRef.split('/uploads/')[1]
-          : imageRef.replace(/^\//, '');
+      let cleanFilename = imageRef;
+      if (cleanFilename.includes('/object/public/medverify/')) {
+        cleanFilename = cleanFilename.split('/object/public/medverify/')[1];
+      } else if (cleanFilename.includes('/medverify/')) {
+        cleanFilename = cleanFilename.split('/medverify/')[1];
+      } else if (cleanFilename.includes('/uploads/file/')) {
+        cleanFilename = cleanFilename.split('/uploads/file/')[1];
+      } else if (cleanFilename.includes('/uploads/')) {
+        cleanFilename = cleanFilename.split('/uploads/')[1];
+      } else if (cleanFilename.includes('/')) {
+        cleanFilename = cleanFilename.split('/').pop() || cleanFilename;
+      }
+      cleanFilename = cleanFilename.replace(/^\//, '').split('?')[0];
 
       const candidates = [
         join(process.cwd(), 'uploads', cleanFilename),
