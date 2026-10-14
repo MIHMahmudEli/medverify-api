@@ -22,6 +22,8 @@ import {
   MedicalCertificate,
   CertificateStatus,
 } from '../../database/entities/medical-certificate.entity';
+import { ReportVerificationToken } from '../../database/entities/report-verification-token.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
 import { OrganizationSettings } from '../../database/entities/organization-settings.entity';
 import {
   CreateReportDto,
@@ -409,5 +411,52 @@ export class ReportsService {
     const safeReg = report.registrationNumber.replace(/[^a-zA-Z0-9_-]/g, '');
     const filename = `Official_Medical_Record_${safeReg}.pdf`;
     return { buffer, filename };
+  }
+
+  async deleteReport(id: string, user: User): Promise<{ success: boolean; message: string }> {
+    const report = await this.reportRepository.findOne({
+      where: { id },
+      relations: ['patient'],
+    });
+
+    if (!report) {
+      throw new NotFoundException(`Medical report with ID ${id} not found`);
+    }
+
+    const regNo = report.registrationNumber;
+
+    await this.dataSource.transaction(async (manager) => {
+      // 1. Delete associated medical certificates
+      await manager.delete(MedicalCertificate, { reportId: id });
+
+      // 2. Delete associated verification tokens
+      await manager.delete(ReportVerificationToken, { reportId: id });
+
+      // 3. Delete associated report revisions
+      await manager.delete(MedicalReportRevision, { reportId: id });
+
+      // 4. Delete the medical report itself
+      await manager.delete(MedicalReport, { id });
+
+      // 5. Write audit log entry
+      const auditEntry = manager.create(AuditLog, {
+        userId: user?.id,
+        action: 'DELETE_REPORT',
+        entityType: 'REPORT',
+        entityId: id,
+        details: {
+          registrationNumber: regNo,
+          patientId: report.patientId,
+          patientName: report.patient?.fullName,
+          deletedBy: user?.email || user?.fullName || 'Super Admin',
+        },
+      });
+      await manager.save(AuditLog, auditEntry);
+    });
+
+    return {
+      success: true,
+      message: `Medical report ${regNo} has been permanently deleted.`,
+    };
   }
 }

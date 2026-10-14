@@ -15,7 +15,8 @@ import { CreatePatientDto, UpdatePatientDto } from './dto/patient.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../database/entities/user.entity';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User, UserRole } from '../../database/entities/user.entity';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 
 @ApiTags('Patients')
@@ -69,7 +70,7 @@ export class PatientsController {
 
   @ApiOperation({ summary: 'Archive patient' })
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @Delete(':id')
+  @Post(':id/archive')
   async archive(@Param('id') id: string) {
     return this.patientsService.archive(id);
   }
@@ -80,4 +81,12 @@ export class PatientsController {
   async restore(@Param('id') id: string) {
     return this.patientsService.unarchive(id);
   }
+
+  @ApiOperation({ summary: 'Permanently delete patient profile (Super Admin only)' })
+  @Roles(UserRole.SUPER_ADMIN)
+  @Delete(':id')
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.patientsService.deletePatient(id, user);
+  }
 }
+

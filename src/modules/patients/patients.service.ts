@@ -4,8 +4,14 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Patient } from '../../database/entities/patient.entity';
+import { MedicalReport } from '../../database/entities/medical-report.entity';
+import { MedicalCertificate } from '../../database/entities/medical-certificate.entity';
+import { MedicalReportRevision } from '../../database/entities/medical-report-revision.entity';
+import { ReportVerificationToken } from '../../database/entities/report-verification-token.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
+import { User } from '../../database/entities/user.entity';
 import { CreatePatientDto, UpdatePatientDto } from './dto/patient.dto';
 import { PaginationQueryDto, PaginatedResult } from '../../common/dto/pagination.dto';
 
@@ -14,6 +20,7 @@ export class PatientsService {
   constructor(
     @InjectRepository(Patient)
     private patientRepository: Repository<Patient>,
+    private dataSource: DataSource,
   ) {}
 
   async findAll(
@@ -133,4 +140,59 @@ export class PatientsService {
     await this.patientRepository.save(patient);
     return { success: true, message: `Patient ${patient.fullName} restored` };
   }
+
+  async deletePatient(id: string, user?: User): Promise<{ success: boolean; message: string }> {
+    const patient = await this.patientRepository.findOne({ where: { id } });
+    if (!patient) {
+      throw new NotFoundException(`Patient with ID ${id} not found`);
+    }
+
+    const patientName = patient.fullName;
+    const passportNo = patient.passportNumber;
+
+    await this.dataSource.transaction(async (manager) => {
+      // 1. Find all reports for this patient
+      const reports = await manager.find(MedicalReport, {
+        where: { patientId: id },
+        select: ['id'],
+      });
+      const reportIds = reports.map((r) => r.id);
+
+      if (reportIds.length > 0) {
+        // Delete all child entities associated with reports
+        await manager.delete(MedicalCertificate, { reportId: In(reportIds) });
+        await manager.delete(ReportVerificationToken, { reportId: In(reportIds) });
+        await manager.delete(MedicalReportRevision, { reportId: In(reportIds) });
+        // Delete the reports
+        await manager.delete(MedicalReport, { patientId: id });
+      }
+
+      // 2. Delete any medical certificates directly associated with this patient
+      await manager.delete(MedicalCertificate, { patientId: id });
+
+      // 3. Delete the patient profile
+      await manager.delete(Patient, { id });
+
+      // 4. Audit log entry
+      const auditEntry = manager.create(AuditLog, {
+        userId: user?.id,
+        action: 'DELETE_PATIENT',
+        entityType: 'PATIENT',
+        entityId: id,
+        details: {
+          patientName,
+          passportNumber: passportNo,
+          deletedReportsCount: reportIds.length,
+          deletedBy: user?.email || user?.fullName || 'Super Admin',
+        },
+      });
+      await manager.save(AuditLog, auditEntry);
+    });
+
+    return {
+      success: true,
+      message: `Patient ${patientName} (${passportNo}) and all associated records have been permanently deleted.`,
+    };
+  }
 }
+

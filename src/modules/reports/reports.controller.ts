@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -182,4 +183,12 @@ export class ReportsController {
 
     res.end(buffer);
   }
+
+  @ApiOperation({ summary: 'Permanently delete a medical report (Super Admin only)' })
+  @Roles(UserRole.SUPER_ADMIN)
+  @Delete(':id')
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.reportsService.deleteReport(id, user);
+  }
 }
+
