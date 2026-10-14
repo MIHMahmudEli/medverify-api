@@ -554,7 +554,7 @@ export class PdfService {
     height: number = 47.73,
   ): Promise<void> {
     const orgName = (settings?.orgName || 'MYSA Medical Center').toUpperCase();
-    const orgCode = (settings?.orgCode || 'MMS').toUpperCase();
+    const orgCode = (settings?.orgCode || 'MMS').toLowerCase();
     const addr1 = settings?.orgAddress || 'Diagnostic & Medical Checkup Centre for Overseas Employment';
     const addr2 = settings?.orgAddressLine2?.trim() || '';
     const phone = settings?.orgPhone || '+880 1700-000000';
@@ -566,7 +566,7 @@ export class PdfService {
       try {
         const logoBuffer = await this.resolveImageBuffer(settings.logoUrl);
         if (logoBuffer) {
-          doc.image(logoBuffer, x + 2, y + 3, { fit: [46, 42], align: 'center', valign: 'center' });
+          doc.image(logoBuffer, x + 2, y + 3, { fit: [50, 42], align: 'center', valign: 'center' });
           customLogoDrawn = true;
         }
       } catch (err) {
@@ -574,103 +574,144 @@ export class PdfService {
       }
     }
 
-    // 2. If no custom logo, draw crisp vector clinical emblem with medical cross & orgCode
+    // 2. If no custom logo, draw vector medical emblem with heartbeat pulse and caring heart
     if (!customLogoDrawn) {
       doc.save();
-      // Clinical emblem container badge
-      doc.roundedRect(x + 2, y + 2, 42, 42, 6).lineWidth(1).strokeColor('#cbd5e1').fillAndStroke('#f8fafc', '#0f2942');
-
-      // Medical cross in clinical cyan/teal
-      doc.roundedRect(x + 19.5, y + 7, 7, 19, 1.5).fill('#0284c7');
-      doc.roundedRect(x + 13.5, y + 13, 19, 7, 1.5).fill('#0284c7');
-
-      // Vital ECG pulse line across the cross
-      doc.lineWidth(1.2).strokeColor('#e11d48');
-      doc.moveTo(x + 8, y + 16.5)
-        .lineTo(x + 15, y + 16.5)
-        .lineTo(x + 18, y + 10)
-        .lineTo(x + 22, y + 23)
-        .lineTo(x + 25, y + 13)
-        .lineTo(x + 28, y + 16.5)
-        .lineTo(x + 38, y + 16.5)
+      // Pulse wave in clinical burgundy
+      doc.lineWidth(1.4).strokeColor('#881337');
+      doc.moveTo(x + 1, y + 21)
+        .lineTo(x + 6, y + 21)
+        .lineTo(x + 9, y + 12)
+        .lineTo(x + 13, y + 32)
+        .lineTo(x + 17, y + 17)
+        .lineTo(x + 21, y + 21)
+        .lineTo(x + 25, y + 21)
         .stroke();
 
-      // Prefix Code in deep navy below cross
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#0f2942');
-      doc.text(orgCode, x + 2, y + 32, { width: 42, align: 'center' });
+      // Heads of caring human figures
+      doc.circle(x + 33, y + 12, 2.5).fill('#0284c7');
+      doc.circle(x + 41, y + 9, 2.8).fill('#0369a1');
+
+      // Heart contour in medical teal/cyan
+      doc.lineWidth(2.2).strokeColor('#0284c7');
+      doc.moveTo(x + 33, y + 16).bezierCurveTo(x + 25, y + 16, x + 24, y + 25, x + 35, y + 32).stroke();
+      doc.moveTo(x + 41, y + 13).bezierCurveTo(x + 50, y + 13, x + 51, y + 22, x + 35, y + 32).stroke();
+
+      // Swoosh curve under heart
+      doc.lineWidth(1.2).strokeColor('#1e293b');
+      doc.moveTo(x + 22, y + 29).bezierCurveTo(x + 32, y + 28, x + 44, y + 31, x + 54, y + 36).stroke();
+
+      // Prefix Code in deep navy
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#000066');
+      doc.text(orgCode, x + 20, y + 34, { width: 34, align: 'center' });
       doc.restore();
     }
 
     // 3. Organization Name Area
-    const nameX = x + 52;
-    const divX = x + 305;
+    const nameX = x + 58;
+    const divX = x + 272;
     const nameW = divX - nameX - 8;
 
-    let nameFontSize = 13;
-    if (orgName.length > 38) {
-      nameFontSize = 10.5;
-    } else if (orgName.length > 26) {
-      nameFontSize = 11.8;
+    // Smart splitting of organization name for optimal 2-line or 1-line display
+    const orgNameUpper = orgName.toUpperCase();
+    let part1 = orgNameUpper;
+    let part2 = '';
+
+    if (orgNameUpper.includes(' SERVICES (PVT.) LTD.')) {
+      part1 = orgNameUpper.replace(' SERVICES (PVT.) LTD.', '');
+      part2 = 'SERVICES (PVT.) LTD.';
+    } else if (orgNameUpper.includes(' (PVT.) LTD.')) {
+      part1 = orgNameUpper.replace(' (PVT.) LTD.', '');
+      part2 = '(PVT.) LTD.';
+    } else if (orgNameUpper.includes(' (PVT) LTD')) {
+      part1 = orgNameUpper.replace(' (PVT) LTD', '');
+      part2 = '(PVT) LTD';
+    } else if (orgNameUpper.length > 24) {
+      const lastSpace = orgNameUpper.lastIndexOf(' ', 24);
+      if (lastSpace > 10) {
+        part1 = orgNameUpper.slice(0, lastSpace);
+        part2 = orgNameUpper.slice(lastSpace + 1);
+      }
     }
 
-    doc.font('Helvetica-Bold').fontSize(nameFontSize).fillColor('#0f2942');
-    doc.text(orgName, nameX, y + 9, {
-      width: nameW,
-      align: 'left',
-      lineGap: 1.5,
-    });
+    doc.save();
+    if (part2) {
+      // 2-line name layout
+      let f1 = 13.5;
+      while (f1 > 9 && doc.font('Helvetica-Bold').fontSize(f1).widthOfString(part1) > nameW) {
+        f1 -= 0.3;
+      }
+      doc.font('Helvetica-Bold').fontSize(f1).fillColor('#1c2d42');
+      doc.text(part1, nameX, y + 9, { width: nameW, lineBreak: false });
+
+      let f2 = 11.5;
+      while (f2 > 8 && doc.font('Helvetica-Bold').fontSize(f2).widthOfString(part2) > nameW) {
+        f2 -= 0.3;
+      }
+      doc.font('Helvetica-Bold').fontSize(f2).fillColor('#1c2d42');
+      doc.text(part2, nameX, y + 25, { width: nameW, lineBreak: false });
+    } else {
+      // 1-line vertically centered layout
+      let f1 = 13.5;
+      while (f1 > 9 && doc.font('Helvetica-Bold').fontSize(f1).widthOfString(part1) > nameW) {
+        f1 -= 0.3;
+      }
+      doc.font('Helvetica-Bold').fontSize(f1).fillColor('#1c2d42');
+      doc.text(part1, nameX, y + 16, { width: nameW, lineBreak: false });
+    }
+    doc.restore();
 
     // 4. Vertical divider bar
-    doc.lineWidth(1.2).strokeColor('#0f2942').moveTo(divX, y + 3).lineTo(divX, y + height - 3).stroke();
+    doc.save();
+    doc.rect(divX, y + 3, 1.4, height - 6).fill('#000066');
+    doc.restore();
 
     // 5. Right-hand Address & Contact Block
     const detailsX = divX + 9;
     const detailsW = (x + width) - detailsX;
 
+    doc.save();
     if (addr2) {
       // 3-line layout
-      doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f2942');
-      doc.text(addr1, detailsX, y + 4.5, {
-        width: detailsW,
-        align: 'left',
-        lineBreak: false,
-        ellipsis: true,
-      });
+      let addr1Size = 7.6;
+      while (addr1Size > 6.0 && doc.font('Helvetica-Bold').fontSize(addr1Size).widthOfString(addr1) > detailsW) {
+        addr1Size -= 0.2;
+      }
+      doc.font('Helvetica-Bold').fontSize(addr1Size).fillColor('#000066');
+      doc.text(addr1, detailsX, y + 5, { width: detailsW, lineBreak: false });
 
-      doc.font('Helvetica').fontSize(7.5).fillColor('#334155');
-      doc.text(addr2, detailsX, y + 17.5, {
-        width: detailsW,
-        align: 'left',
-        lineBreak: false,
-        ellipsis: true,
-      });
+      let addr2Size = 7.4;
+      while (addr2Size > 6.0 && doc.font('Helvetica').fontSize(addr2Size).widthOfString(addr2) > detailsW) {
+        addr2Size -= 0.2;
+      }
+      doc.font('Helvetica').fontSize(addr2Size).fillColor('#000066');
+      doc.text(addr2, detailsX, y + 19, { width: detailsW, lineBreak: false });
 
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#0f2942');
-      doc.text(`Mobile No.: ${phone}`, detailsX, y + 30.5, {
-        width: detailsW,
-        align: 'left',
-        lineBreak: false,
-        ellipsis: true,
-      });
+      let phoneSize = 7.4;
+      const phoneText = `Mobile No.: ${phone}`;
+      while (phoneSize > 6.0 && doc.font('Helvetica-Bold').fontSize(phoneSize).widthOfString(phoneText) > detailsW) {
+        phoneSize -= 0.2;
+      }
+      doc.font('Helvetica-Bold').fontSize(phoneSize).fillColor('#000066');
+      doc.text(phoneText, detailsX, y + 33, { width: detailsW, lineBreak: false });
     } else {
       // 2-line layout (cleaner when no secondary address)
-      doc.font('Helvetica-Bold').fontSize(8.2).fillColor('#0f2942');
-      doc.text(addr1, detailsX, y + 8, {
-        width: detailsW,
-        align: 'left',
-        lineBreak: false,
-        ellipsis: true,
-      });
+      let addr1Size = 8.0;
+      while (addr1Size > 6.0 && doc.font('Helvetica-Bold').fontSize(addr1Size).widthOfString(addr1) > detailsW) {
+        addr1Size -= 0.2;
+      }
+      doc.font('Helvetica-Bold').fontSize(addr1Size).fillColor('#000066');
+      doc.text(addr1, detailsX, y + 11, { width: detailsW, lineBreak: false });
 
-      doc.font('Helvetica-Bold').fontSize(7.8).fillColor('#0f2942');
-      const contactText = email ? `Mobile: ${phone} | Email: ${email}` : `Mobile No.: ${phone}`;
-      doc.text(contactText, detailsX, y + 23.5, {
-        width: detailsW,
-        align: 'left',
-        lineBreak: false,
-        ellipsis: true,
-      });
+      const contactText = email ? `Mobile No.: ${phone} | Email: ${email}` : `Mobile No.: ${phone}`;
+      let contactSize = 7.6;
+      while (contactSize > 6.0 && doc.font('Helvetica-Bold').fontSize(contactSize).widthOfString(contactText) > detailsW) {
+        contactSize -= 0.2;
+      }
+      doc.font('Helvetica-Bold').fontSize(contactSize).fillColor('#000066');
+      doc.text(contactText, detailsX, y + 27, { width: detailsW, lineBreak: false });
     }
+    doc.restore();
   }
 
   /**
