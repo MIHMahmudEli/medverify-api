@@ -363,7 +363,8 @@ export class ReportsService {
 
   async getPdfBuffer(id: string): Promise<{ buffer: Buffer; filename: string }> {
     const report = await this.findOne(id);
-    const buffer = await this.pdfService.generateReportPdf(report, report.patient);
+    const settings = await this.settingsRepository.findOne({ where: {} });
+    const buffer = await this.pdfService.generateReportPdf(report, report.patient, settings || undefined);
     const filename = `MedVerify_${report.registrationNumber}_${report.patient.passportNumber}.pdf`;
     return { buffer, filename };
   }
@@ -402,7 +403,7 @@ export class ReportsService {
         settings || undefined,
       );
     } else {
-      buffer = await this.pdfService.generateReportPdf(report, report.patient);
+      buffer = await this.pdfService.generateReportPdf(report, report.patient, settings || undefined);
     }
 
     const safeReg = report.registrationNumber.replace(/[^a-zA-Z0-9_-]/g, '');

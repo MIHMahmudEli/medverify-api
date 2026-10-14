@@ -84,6 +84,16 @@ export interface PublicVerificationResponse {
   revokedAt?: Date;
   allowPublicDownload?: boolean;
   allowPublicPrint?: boolean;
+  settings?: {
+    orgName: string;
+    orgCode: string;
+    orgAddress: string;
+    orgAddressLine2?: string;
+    orgPhone: string;
+    orgEmail: string;
+    reportHeaderTitle: string;
+    logoUrl?: string;
+  };
 }
 
 @Injectable()
@@ -206,6 +216,16 @@ export class VerificationService {
           destinationCountry: p?.country,
           agency: p?.agency,
           issuingOrganization: settings.orgName || 'MYSA Medical Center',
+          settings: {
+            orgName: settings.orgName || 'MYSA Medical Center',
+            orgCode: settings.orgCode || 'MMS',
+            orgAddress: settings.orgAddress || 'Diagnostic & Medical Checkup Centre for Overseas Employment',
+            orgAddressLine2: settings.orgAddressLine2 || 'VIP Road, Dhaka-1000',
+            orgPhone: settings.orgPhone || '+880 1700-000000',
+            orgEmail: settings.orgEmail || 'info@mysamedicalbd.com',
+            reportHeaderTitle: settings.reportHeaderTitle || 'MEDICAL TEST REPORT',
+            logoUrl: settings.logoUrl,
+          },
           message:
             'This medical examination report is currently in DRAFT status and has not been officially finalized or certified yet.',
           patient: {
@@ -460,6 +480,16 @@ export class VerificationService {
       agency: patientRaw?.agency,
       allowPublicDownload: disclosure.allowPublicDownload !== false,
       allowPublicPrint: disclosure.allowPublicPrint !== false,
+      settings: {
+        orgName: settings.orgName || 'MYSA Medical Center',
+        orgCode: settings.orgCode || 'MMS',
+        orgAddress: settings.orgAddress || 'Diagnostic & Medical Checkup Centre for Overseas Employment',
+        orgAddressLine2: settings.orgAddressLine2 || 'VIP Road, Dhaka-1000',
+        orgPhone: settings.orgPhone || '+880 1700-000000',
+        orgEmail: settings.orgEmail || 'info@mysamedicalbd.com',
+        reportHeaderTitle: settings.reportHeaderTitle || 'MEDICAL TEST REPORT',
+        logoUrl: settings.logoUrl,
+      },
     };
   }
 

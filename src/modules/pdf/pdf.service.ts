@@ -1,4 +1,4 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, Optional, forwardRef } from '@nestjs/common';
 const PDFDocument = require('pdfkit');
 import * as QRCode from 'qrcode';
 import * as fs from 'fs';
@@ -8,6 +8,7 @@ import { Patient } from '../../database/entities/patient.entity';
 import { MedicalCertificate } from '../../database/entities/medical-certificate.entity';
 import { OrganizationSettings } from '../../database/entities/organization-settings.entity';
 import { VerificationService } from '../verification/verification.service';
+import { SettingsService } from '../settings/settings.service';
 
 export interface PdfRenderOptions {
   pageNumber?: number;
@@ -21,6 +22,9 @@ export class PdfService {
   constructor(
     @Inject(forwardRef(() => VerificationService))
     private readonly verificationService: VerificationService,
+    @Optional()
+    @Inject(forwardRef(() => SettingsService))
+    private readonly settingsService?: SettingsService,
   ) {}
 
   private calculateAge(dobStr: string): string {
@@ -249,7 +253,10 @@ export class PdfService {
     doc.text(orgName.toUpperCase(), 35, 42, { align: 'center', width: 525 });
 
     doc.font('Helvetica').fontSize(8).fillColor('#475569');
-    doc.text(orgAddress, 35, 59, { align: 'center', width: 525 });
+    const fullAddress = settings?.orgAddressLine2
+      ? `${orgAddress}, ${settings.orgAddressLine2}`
+      : orgAddress;
+    doc.text(fullAddress, 35, 59, { align: 'center', width: 525 });
 
     doc.fontSize(7.5).fillColor('#64748b');
     doc.text(`Phone: ${orgPhone}  |  Email: ${orgEmail}  |  Govt. Approved Center`, 35, 71, {
@@ -535,14 +542,146 @@ export class PdfService {
   }
 
   /**
+   * Renders the dynamic official clinical center header banner for reports.
+   * Reproduces the high-resolution vector emblem, clinic title, vertical separator, and address/contact block.
+   */
+  public async drawDynamicHeaderBanner(
+    doc: any,
+    settings?: OrganizationSettings,
+    x: number = 28.5,
+    y: number = 28.5,
+    width: number = 538.75,
+    height: number = 47.73,
+  ): Promise<void> {
+    const orgName = (settings?.orgName || 'MYSA MEDICAL SERVICES (PVT.) LTD.').toUpperCase();
+    const orgCode = (settings?.orgCode || 'MMS').toLowerCase();
+    const addr1 = settings?.orgAddress || 'Diagnostic & Medical Checkup Centre for Overseas Employment';
+    const addr2 = settings?.orgAddressLine2 || 'VIP Road, Dhaka-1000';
+    const phone = settings?.orgPhone || '+880 1700-000000';
+
+    // 1. Check for custom uploaded clinic logo
+    let customLogoDrawn = false;
+    if (settings?.logoUrl) {
+      try {
+        const logoBuffer = await this.resolveImageBuffer(settings.logoUrl);
+        if (logoBuffer) {
+          doc.image(logoBuffer, x + 2, y + 4, { fit: [48, 40], align: 'center', valign: 'center' });
+          customLogoDrawn = true;
+        }
+      } catch (err) {
+        customLogoDrawn = false;
+      }
+    }
+
+    // 2. If no custom logo, draw crisp vector medical emblem with heartbeat pulse and orgCode
+    if (!customLogoDrawn) {
+      doc.save();
+      // ECG / pulse wave in clinical deep burgundy
+      doc.lineWidth(1.3).strokeColor('#881337');
+      doc.moveTo(x + 1, y + 23)
+        .lineTo(x + 7, y + 23)
+        .lineTo(x + 11, y + 14)
+        .lineTo(x + 15, y + 33)
+        .lineTo(x + 19, y + 19)
+        .lineTo(x + 23, y + 23)
+        .lineTo(x + 26, y + 23)
+        .stroke();
+
+      // Stylized caring human heads
+      doc.circle(x + 35, y + 13, 2.6).fill('#0284c7');
+      doc.circle(x + 43, y + 10, 2.9).fill('#0369a1');
+
+      // Heart contour in medical teal/cyan
+      doc.lineWidth(1.8).strokeColor('#0284c7');
+      doc.moveTo(x + 35, y + 18).bezierCurveTo(x + 27, y + 18, x + 26, y + 27, x + 37, y + 34).stroke();
+      doc.moveTo(x + 43, y + 15).bezierCurveTo(x + 52, y + 15, x + 53, y + 24, x + 37, y + 34).stroke();
+
+      // Prefix Code in deep navy
+      doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#000066');
+      doc.text(orgCode, x + 19, y + 34.5, { width: 36, align: 'center' });
+      doc.restore();
+    }
+
+    // 3. Organization Name Area
+    const nameX = x + 58;
+    const divX = x + 310;
+    const nameW = divX - nameX - 10;
+
+    let nameFontSize = 13.5;
+    if (orgName.length > 34) {
+      nameFontSize = 11.5;
+    } else if (orgName.length > 24) {
+      nameFontSize = 12.5;
+    }
+
+    doc.font('Helvetica-Bold').fontSize(nameFontSize).fillColor('#1c2d42');
+    doc.text(orgName, nameX, y + 9, {
+      width: nameW,
+      align: 'left',
+      lineGap: 1.5,
+    });
+
+    // 4. Vertical divider bar
+    doc.lineWidth(1.2).strokeColor('#000066').moveTo(divX, y + 3).lineTo(divX, y + height - 3).stroke();
+
+    // 5. Right-hand Address & Contact Block
+    const detailsX = divX + 10;
+    const detailsW = (x + width) - detailsX;
+
+    doc.font('Helvetica-Bold').fontSize(8.2).fillColor('#000066');
+    doc.text(addr1, detailsX, y + 4.5, {
+      width: detailsW,
+      align: 'left',
+      lineBreak: false,
+      ellipsis: true,
+    });
+
+    doc.font('Helvetica').fontSize(7.8).fillColor('#000066');
+    doc.text(addr2, detailsX, y + 17.5, {
+      width: detailsW,
+      align: 'left',
+      lineBreak: false,
+      ellipsis: true,
+    });
+
+    doc.font('Helvetica-Bold').fontSize(7.8).fillColor('#000066');
+    doc.text(`Mobile No.: ${phone}`, detailsX, y + 30.5, {
+      width: detailsW,
+      align: 'left',
+      lineBreak: false,
+      ellipsis: true,
+    });
+  }
+
+  /**
    * Renders PAGE 2: Detailed Medical Test Report (matches reference PDF layout)
    */
   public async renderReportPage(
     doc: any,
     report: MedicalReport,
     patient: Patient,
-    opts: PdfRenderOptions = {},
+    settingsOrOpts?: OrganizationSettings | PdfRenderOptions,
+    maybeOpts?: PdfRenderOptions,
   ) {
+    let settings: OrganizationSettings | undefined;
+    let opts: PdfRenderOptions = {};
+
+    if (settingsOrOpts && ('pageNumber' in settingsOrOpts || 'totalPages' in settingsOrOpts || 'qrUrl' in settingsOrOpts)) {
+      opts = settingsOrOpts as PdfRenderOptions;
+      settings = undefined;
+    } else {
+      settings = settingsOrOpts as OrganizationSettings;
+      opts = maybeOpts || {};
+    }
+
+    if (!settings && this.settingsService) {
+      try {
+        settings = await this.settingsService.getSettings();
+      } catch (err) {
+        // fallback to defaults
+      }
+    }
+
     const pageNum = opts.pageNumber || 2;
     const totalPages = opts.totalPages || 2;
     const qrBuffer = opts.qrBuffer;
@@ -552,22 +691,13 @@ export class PdfService {
     const data = report.reportData || {};
     const age = safePatient.dateOfBirth ? this.calculateAge(safePatient.dateOfBirth) : 'N/A';
 
-    // --- 1. TOP HEADER BANNER ---
-    const bannerPath = await this.resolveImageBuffer(undefined, 'header_banner.png');
-    if (bannerPath) {
-      doc.image(bannerPath, 28.5, 28.5, { width: 538.75, height: 47.73 });
-    } else {
-      doc.rect(28.5, 28.5, 538.75, 47.73).fill('#0f172a');
-      doc.fillColor('#ffffff').fontSize(14).font('Helvetica-Bold');
-      doc.text('MYSA MEDICAL SERVICES (PVT.) LTD.', 28.5, 34, { align: 'center', width: 538.75 });
-      doc.fontSize(7.5).font('Helvetica');
-      doc.text('Govt. Approved Medical Examination & Diagnostic Center for Overseas Employment', 28.5, 50, { align: 'center', width: 538.75 });
-      doc.text('Licence No: DGHS/MED-84920/2024 | Phone: +880 1700-000000', 28.5, 60, { align: 'center', width: 538.75 });
-    }
+    // --- 1. TOP HEADER BANNER (DYNAMICALLY GENERATED FROM SETTINGS) ---
+    await this.drawDynamicHeaderBanner(doc, settings, 28.5, 28.5, 538.75, 47.73);
 
     // --- 2. DOCUMENT TITLE ---
+    const reportTitle = (settings?.reportHeaderTitle || 'MEDICAL TEST REPORT').toUpperCase();
     doc.fillColor('#212529').fontSize(11.5).font('Helvetica-Bold');
-    doc.text('MEDICAL TEST REPORT', 28.5, 80, { align: 'center', width: 538.75 });
+    doc.text(reportTitle, 28.5, 80, { align: 'center', width: 538.75 });
 
     // --- 3. REGISTRATION NUMBER, BARCODE & REG DATE ---
     const regY = 99.3;
@@ -923,7 +1053,7 @@ export class PdfService {
         });
 
         // --- PAGE 2: Detailed Medical Test Report ---
-        await this.renderReportPage(doc, report, patient, {
+        await this.renderReportPage(doc, report, patient, settings, {
           pageNumber: 2,
           totalPages: 2,
           qrUrl,
@@ -988,9 +1118,21 @@ export class PdfService {
   /**
    * Generates Standalone Detailed Report PDF (1 Page)
    */
-  async generateReportPdf(report: MedicalReport, patient: Patient): Promise<Buffer> {
+  async generateReportPdf(
+    report: MedicalReport,
+    patient: Patient,
+    settings?: OrganizationSettings,
+  ): Promise<Buffer> {
     return new Promise(async (resolve, reject) => {
       try {
+        if (!settings && this.settingsService) {
+          try {
+            settings = await this.settingsService.getSettings();
+          } catch (err) {
+            // fallback
+          }
+        }
+
         const doc = new PDFDocument({
           size: 'A4',
           margins: { top: 20, bottom: 20, left: 28.5, right: 28.5 },
@@ -1025,7 +1167,7 @@ export class PdfService {
           qrBuffer = null;
         }
 
-        await this.renderReportPage(doc, report, patient, {
+        await this.renderReportPage(doc, report, patient, settings, {
           pageNumber: 1,
           totalPages: 1,
           qrUrl,

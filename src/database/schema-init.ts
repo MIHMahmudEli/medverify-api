@@ -30,6 +30,7 @@ export async function ensureSchema(dataSource: DataSource) {
     // 2. Add columns to organization_settings if they don't exist
     await dataSource.query(`
       ALTER TABLE organization_settings
+      ADD COLUMN IF NOT EXISTS "orgAddressLine2" text DEFAULT 'VIP Road, Dhaka-1000',
       ADD COLUMN IF NOT EXISTS "certificateTitle" varchar(255) DEFAULT 'MEDICAL FITNESS CERTIFICATE',
       ADD COLUMN IF NOT EXISTS "certificateNumberPrefix" varchar(50) DEFAULT 'MC',
       ADD COLUMN IF NOT EXISTS "signatoryName" varchar(255) DEFAULT 'Dr. A. K. M. Shamsuddin',

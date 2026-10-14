@@ -39,7 +39,10 @@ export class OrganizationSettings {
   @Column({ type: 'text', default: 'Diagnostic & Medical Checkup Centre for Overseas Employment' })
   orgAddress: string;
 
-  @Column({ type: 'varchar', length: 100, default: '+880 1700-000000' })
+  @Column({ type: 'text', nullable: true, default: 'VIP Road, Dhaka-1000' })
+  orgAddressLine2?: string;
+
+  @Column({ type: 'varchar', length: 255, default: '+880 1700-000000' })
   orgPhone: string;
 
   @Column({ type: 'varchar', length: 100, default: 'info@medverify.com' })
