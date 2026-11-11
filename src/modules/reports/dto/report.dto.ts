@@ -19,6 +19,11 @@ export class CreateReportDto {
   @IsNotEmpty()
   patientId: string;
 
+  @ApiPropertyOptional({ description: 'ID of the issuing clinical organization / medical center' })
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
@@ -55,6 +60,11 @@ export class CreateReportDto {
 }
 
 export class UpdateReportDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsDateString()

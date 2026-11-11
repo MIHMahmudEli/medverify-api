@@ -19,6 +19,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { HealthModule } from './modules/health/health.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -46,6 +47,7 @@ import { AppController } from './app.controller';
     DashboardModule,
     AuditModule,
     SettingsModule,
+    OrganizationsModule,
     UploadsModule,
     CertificatesModule,
   ],

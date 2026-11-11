@@ -53,13 +53,14 @@ export class ReportsService {
     private dataSource: DataSource,
   ) {}
 
-  private async generateRegistrationNumber(): Promise<string> {
+  private async generateRegistrationNumber(orgCode?: string): Promise<string> {
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const prefix = `MMS${yy}${mm}`;
+    const cleanCode = (orgCode || 'MMS').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') || 'MMS';
+    const prefix = `${cleanCode}${yy}${mm}`;
 
-    // Get count of reports this month to generate sequence
+    // Get count of reports to generate sequence
     const count = await this.reportRepository.count();
     const seq = String(count + 101).padStart(3, '0');
     let regNo = `${prefix}${seq}`;
@@ -129,7 +130,8 @@ export class ReportsService {
       .createQueryBuilder('report')
       .leftJoinAndSelect('report.patient', 'patient')
       .leftJoinAndSelect('report.finalizedBy', 'finalizedBy')
-      .leftJoinAndSelect('report.createdBy', 'createdBy');
+      .leftJoinAndSelect('report.createdBy', 'createdBy')
+      .leftJoinAndSelect('report.organization', 'organization');
 
     if (query.status) {
       qb.andWhere('report.status = :status', { status: query.status });
@@ -186,6 +188,7 @@ export class ReportsService {
         'revisions',
         'revisions.changedBy',
         'verificationTokens',
+        'organization',
       ],
     });
 
@@ -211,13 +214,25 @@ export class ReportsService {
       templateVersionId = active.activeVersion.id;
     }
 
-    const regNo = await this.generateRegistrationNumber();
+    // Resolve issuing organization
+    let org: OrganizationSettings | null = null;
+    if (dto.organizationId) {
+      org = await this.settingsRepository.findOne({ where: { id: dto.organizationId } });
+    }
+    if (!org) {
+      org =
+        (await this.settingsRepository.findOne({ where: { isDefault: true } })) ||
+        (await this.settingsRepository.findOne({ where: {}, order: { createdAt: 'ASC' } }));
+    }
+
+    const regNo = await this.generateRegistrationNumber(org?.orgCode);
     const now = new Date().toISOString().split('T')[0];
 
     const report = this.reportRepository.create({
       registrationNumber: regNo,
       patientId: dto.patientId,
       templateVersionId,
+      organizationId: org?.id,
       status: ReportStatus.DRAFT,
       registeredAt: dto.registeredAt || now,
       reportData: dto.reportData || {},
@@ -242,6 +257,9 @@ export class ReportsService {
       );
     }
 
+    if (dto.organizationId !== undefined) {
+      report.organizationId = dto.organizationId;
+    }
     if (dto.registeredAt) report.registeredAt = dto.registeredAt;
     if (dto.status && [ReportStatus.DRAFT, ReportStatus.IN_REVIEW].includes(dto.status)) {
       report.status = dto.status;
@@ -403,8 +421,14 @@ export class ReportsService {
 
   async getPdfBuffer(id: string): Promise<{ buffer: Buffer; filename: string }> {
     const report = await this.findOne(id);
-    const settings = await this.settingsRepository.findOne({ where: {} });
-    const buffer = await this.pdfService.generateReportPdf(report, report.patient, settings || undefined);
+    const orgSettings =
+      report.organization ||
+      (report.organizationId
+        ? await this.settingsRepository.findOne({ where: { id: report.organizationId } })
+        : await this.settingsRepository.findOne({ where: { isDefault: true } })) ||
+      (await this.settingsRepository.findOne({ where: {} }));
+
+    const buffer = await this.pdfService.generateReportPdf(report, report.patient, orgSettings || undefined);
     const filename = `MedVerify_${report.registrationNumber}_${report.patient.passportNumber}.pdf`;
     return { buffer, filename };
   }
@@ -416,10 +440,16 @@ export class ReportsService {
       relations: ['issuedBy', 'report', 'patient'],
     });
 
+    const orgSettings =
+      report.organization ||
+      (report.organizationId
+        ? await this.settingsRepository.findOne({ where: { id: report.organizationId } })
+        : await this.settingsRepository.findOne({ where: { isDefault: true } })) ||
+      (await this.settingsRepository.findOne({ where: {} }));
+
     if (!cert && report.status === ReportStatus.FINALIZED) {
       const systemAdminId = report.finalizedById || report.createdById;
-      const settings = await this.settingsRepository.findOne({ where: {} });
-      const certPrefix = settings?.certificateNumberPrefix || 'MC';
+      const certPrefix = orgSettings?.certificateNumberPrefix || 'MC';
       const certNumber = await this.generateCertificateNumber(certPrefix);
       const newCert = this.certificateRepository.create({
         reportId: report.id,
@@ -433,17 +463,16 @@ export class ReportsService {
       cert = await this.certificateRepository.save(newCert);
     }
 
-    const settings = await this.settingsRepository.findOne({ where: {} });
     let buffer: Buffer;
     if (cert) {
       buffer = await this.pdfService.generateCombinedPdf(
         cert,
         report,
         report.patient,
-        settings || undefined,
+        orgSettings || undefined,
       );
     } else {
-      buffer = await this.pdfService.generateReportPdf(report, report.patient, settings || undefined);
+      buffer = await this.pdfService.generateReportPdf(report, report.patient, orgSettings || undefined);
     }
 
     const safeReg = report.registrationNumber.replace(/[^a-zA-Z0-9_-]/g, '');

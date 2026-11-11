@@ -92,7 +92,7 @@ export class CertificatesService {
   ): Promise<MedicalCertificate> {
     const report = await this.reportRepository.findOne({
       where: { id: reportId },
-      relations: ['patient', 'revisions', 'finalizedBy'],
+      relations: ['patient', 'revisions', 'finalizedBy', 'organization'],
     });
 
     if (!report) {
@@ -114,7 +114,14 @@ export class CertificatesService {
       );
     }
 
-    const settings = await this.settingsService.getSettings();
+    let settings = report.organization;
+    if (!settings && report.organizationId) {
+      settings = await this.settingsService.getSettings(report.organizationId);
+    }
+    if (!settings) {
+      settings = await this.settingsService.getSettings();
+    }
+
     if (!settings.orgName || !settings.certificateTitle) {
       throw new BadRequestException(
         'Mandatory organization settings (Organization Name, Certificate Title) are missing. Please complete organization configuration before issuing certificates.',
@@ -168,15 +175,19 @@ export class CertificatesService {
         agency: report.patient.agency,
       },
       organization: {
+        id: settings.id,
         orgName: settings.orgName,
         orgCode: settings.orgCode,
         orgAddress: settings.orgAddress,
+        orgAddressLine2: settings.orgAddressLine2,
         orgPhone: settings.orgPhone,
         orgEmail: settings.orgEmail,
+        logoUrl: settings.logoUrl,
         certificateTitle: settings.certificateTitle,
         signatoryName: settings.signatoryName,
         signatoryDesignation: settings.signatoryDesignation,
         signatoryLicenseNumber: settings.signatoryLicenseNumber,
+        signatorySignatureUrl: settings.signatorySignatureUrl,
       },
       xrayFinding: report.xrayFinding,
       xrayRemarks: report.xrayRemarks,
@@ -314,11 +325,18 @@ export class CertificatesService {
     const cert = await this.getCertificateById(id);
     const report = await this.reportRepository.findOne({
       where: { id: cert.reportId },
-      relations: ['patient'],
+      relations: ['patient', 'organization'],
     });
     if (!report) throw new NotFoundException('Associated report not found');
 
-    const settings = await this.settingsService.getSettings();
+    let settings = report.organization;
+    if (!settings && report.organizationId) {
+      settings = await this.settingsService.getSettings(report.organizationId);
+    }
+    if (!settings) {
+      settings = await this.settingsService.getSettings();
+    }
+
     const buffer = await this.pdfService.generateCertificatePdf(
       cert,
       report,
@@ -352,13 +370,13 @@ export class CertificatesService {
     if (cert) {
       report = await this.reportRepository.findOne({
         where: { id: cert.reportId },
-        relations: ['patient'],
+        relations: ['patient', 'organization'],
       });
     } else {
       // Find by report id
       report = await this.reportRepository.findOne({
         where: { id: reportIdOrCertId },
-        relations: ['patient'],
+        relations: ['patient', 'organization'],
       });
       if (!report) {
         throw new NotFoundException(`Medical record not found for ID ${reportIdOrCertId}`);
@@ -375,7 +393,14 @@ export class CertificatesService {
     }
 
     if (!report) throw new NotFoundException('Report not found');
-    const settings = await this.settingsService.getSettings();
+
+    let settings = report.organization;
+    if (!settings && report.organizationId) {
+      settings = await this.settingsService.getSettings(report.organizationId);
+    }
+    if (!settings) {
+      settings = await this.settingsService.getSettings();
+    }
 
     const patient = report.patient || cert?.patient;
     let buffer: Buffer;
@@ -388,7 +413,7 @@ export class CertificatesService {
       );
     } else {
       // Fallback to report pdf if certificate cannot be issued (e.g. Draft)
-      buffer = await this.pdfService.generateReportPdf(report, patient);
+      buffer = await this.pdfService.generateReportPdf(report, patient, settings);
     }
 
     const safeReg = report.registrationNumber.replace(/[^a-zA-Z0-9_-]/g, '');

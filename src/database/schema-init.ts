@@ -40,8 +40,29 @@ export async function ensureSchema(dataSource: DataSource) {
       ADD COLUMN IF NOT EXISTS "certificateFooter" text DEFAULT 'This official certificate verifies fitness for overseas employment. Authenticate online using the security QR code.',
       ADD COLUMN IF NOT EXISTS "certificateValidityDays" integer DEFAULT 90,
       ADD COLUMN IF NOT EXISTS "certificateFields" jsonb DEFAULT '{"showPassport": true, "showDob": true, "showNationality": true, "showDestination": true, "showDoctorDetails": true}'::jsonb,
-      ADD COLUMN IF NOT EXISTS "publicDisclosure" jsonb DEFAULT '{"patientNameMode": "INITIALS", "showPassport": false, "showDob": false, "showNationality": true, "showDestination": true, "showDetailedReport": false, "allowedReportSections": ["physical", "systemic", "lab", "xray"], "allowPublicDownload": true, "allowPublicPrint": true}'::jsonb;
+      ADD COLUMN IF NOT EXISTS "publicDisclosure" jsonb DEFAULT '{"patientNameMode": "INITIALS", "showPassport": false, "showDob": false, "showNationality": true, "showDestination": true, "showDetailedReport": false, "allowedReportSections": ["physical", "systemic", "lab", "xray"], "allowPublicDownload": true, "allowPublicPrint": true}'::jsonb,
+      ADD COLUMN IF NOT EXISTS "isDefault" boolean DEFAULT false,
+      ADD COLUMN IF NOT EXISTS "isActive" boolean DEFAULT true,
+      ADD COLUMN IF NOT EXISTS "createdAt" timestamptz DEFAULT now();
     `);
+
+    // Ensure at least one organization has isDefault = true
+    await dataSource.query(`
+      UPDATE organization_settings
+      SET "isDefault" = true
+      WHERE id = (SELECT id FROM organization_settings ORDER BY "createdAt" ASC, "updatedAt" ASC LIMIT 1)
+        AND NOT EXISTS (SELECT 1 FROM organization_settings WHERE "isDefault" = true);
+    `).catch(() => {});
+
+    // 3. Add organizationId to medical_reports and associate existing reports
+    await dataSource.query(`
+      ALTER TABLE medical_reports
+      ADD COLUMN IF NOT EXISTS "organizationId" uuid;
+      CREATE INDEX IF NOT EXISTS "IDX_med_reports_organizationId" ON medical_reports ("organizationId");
+      UPDATE medical_reports
+      SET "organizationId" = (SELECT id FROM organization_settings WHERE "isDefault" = true LIMIT 1)
+      WHERE "organizationId" IS NULL;
+    `).catch(() => {});
 
     // Clean up any legacy static banner fallbacks from database
     await dataSource.query(`
@@ -56,14 +77,14 @@ export async function ensureSchema(dataSource: DataSource) {
       UPDATE organization_settings SET "orgName" = 'MYSA Medical Center' WHERE "orgName" = 'MYSA MEDICAL SERVICES (PVT.) LTD.';
     `).catch(() => {});
 
-    // 3. Create indices on medical_certificates
+    // 4. Create indices on medical_certificates
     await dataSource.query(`
       CREATE INDEX IF NOT EXISTS "IDX_med_cert_reportId" ON medical_certificates ("reportId");
       CREATE INDEX IF NOT EXISTS "IDX_med_cert_patientId" ON medical_certificates ("patientId");
       CREATE INDEX IF NOT EXISTS "IDX_med_cert_status" ON medical_certificates (status);
     `);
 
-    console.log('[Schema] Medical certificates and organization settings tables verified.');
+    console.log('[Schema] Medical certificates and multi-organization tables verified.');
   } catch (err: any) {
     console.warn('[Schema] Notice during schema ensure:', err?.message || err);
   }

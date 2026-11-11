@@ -116,6 +116,17 @@ export class OrganizationSettings {
   })
   publicDisclosure: PublicDisclosureConfig;
 
+  @Column({ type: 'boolean', default: false })
+  isDefault: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  isActive: boolean;
+
+  @Column({ type: 'timestamp with time zone', default: () => 'CURRENT_TIMESTAMP' })
+  createdAt: Date;
+
   @UpdateDateColumn({ type: 'timestamp with time zone' })
   updatedAt: Date;
 }
+
+export type Organization = OrganizationSettings;

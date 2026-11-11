@@ -15,6 +15,7 @@ import { ReportTemplateVersion } from './report-template-version.entity';
 import { MedicalReportRevision } from './medical-report-revision.entity';
 import { ReportVerificationToken } from './report-verification-token.entity';
 import { MedicalCertificate } from './medical-certificate.entity';
+import { OrganizationSettings } from './organization-settings.entity';
 
 export enum ReportStatus {
   DRAFT = 'DRAFT',
@@ -54,6 +55,14 @@ export class MedicalReport {
   @ManyToOne(() => ReportTemplateVersion, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'templateVersionId' })
   templateVersion: ReportTemplateVersion;
+
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  organizationId?: string;
+
+  @ManyToOne(() => OrganizationSettings, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'organizationId' })
+  organization?: OrganizationSettings;
 
   @Index()
   @Column({

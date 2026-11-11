@@ -16,8 +16,16 @@ export class SettingsService implements OnModuleInit {
     await this.getSettings();
   }
 
-  async getSettings(): Promise<OrganizationSettings> {
-    let settings = await this.settingsRepository.findOne({ where: {} });
+  async getSettings(orgId?: string): Promise<OrganizationSettings> {
+    if (orgId) {
+      const specific = await this.settingsRepository.findOne({ where: { id: orgId } });
+      if (specific) return specific;
+    }
+
+    let settings = await this.settingsRepository.findOne({ where: { isDefault: true } });
+    if (!settings) {
+      settings = await this.settingsRepository.findOne({ where: {}, order: { createdAt: 'ASC' } });
+    }
     if (!settings) {
       settings = this.settingsRepository.create({
         orgName: 'MYSA Medical Center',
@@ -35,14 +43,20 @@ export class SettingsService implements OnModuleInit {
         signatoryLicenseNumber: 'BMDC Reg No: A-12345',
         certificateFooter: 'This official certificate verifies fitness for overseas employment. Authenticate online using the security QR code.',
         certificateValidityDays: 90,
+        isDefault: true,
+        isActive: true,
       });
       settings = await this.settingsRepository.save(settings);
     }
     return settings;
   }
 
-  async updateSettings(dto: Partial<OrganizationSettings>): Promise<OrganizationSettings> {
-    const settings = await this.getSettings();
+  async getSettingsForReport(organizationId?: string): Promise<OrganizationSettings> {
+    return this.getSettings(organizationId);
+  }
+
+  async updateSettings(dto: Partial<OrganizationSettings>, orgId?: string): Promise<OrganizationSettings> {
+    const settings = await this.getSettings(orgId);
     Object.assign(settings, dto);
     return this.settingsRepository.save(settings);
   }
