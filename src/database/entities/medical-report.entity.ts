@@ -45,7 +45,7 @@ export class MedicalReport {
   @Column({ type: 'uuid' })
   patientId: string;
 
-  @ManyToOne(() => Patient, (patient) => patient.reports, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => Patient, (patient) => patient.reports, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'patientId' })
   patient: Patient;
 

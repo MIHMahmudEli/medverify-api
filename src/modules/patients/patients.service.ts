@@ -151,29 +151,30 @@ export class PatientsService {
     const passportNo = patient.passportNumber;
 
     await this.dataSource.transaction(async (manager) => {
-      // 1. Find all reports for this patient
+      // 1. Find all medical reports for this patient
       const reports = await manager.find(MedicalReport, {
         where: { patientId: id },
         select: ['id'],
       });
       const reportIds = reports.map((r) => r.id);
 
+      // 2. Cascade delete all child records of these reports
       if (reportIds.length > 0) {
-        // Delete all child entities associated with reports
         await manager.delete(MedicalCertificate, { reportId: In(reportIds) });
         await manager.delete(ReportVerificationToken, { reportId: In(reportIds) });
         await manager.delete(MedicalReportRevision, { reportId: In(reportIds) });
-        // Delete the reports
-        await manager.delete(MedicalReport, { patientId: id });
       }
 
-      // 2. Delete any medical certificates directly associated with this patient
+      // 3. Delete any medical certificates directly associated with this patient
       await manager.delete(MedicalCertificate, { patientId: id });
 
-      // 3. Delete the patient profile
+      // 4. Delete all medical reports associated with this patient
+      await manager.delete(MedicalReport, { patientId: id });
+
+      // 5. Delete the patient demographic record
       await manager.delete(Patient, { id });
 
-      // 4. Audit log entry
+      // 6. Audit log entry
       const auditEntry = manager.create(AuditLog, {
         userId: user?.id,
         action: 'DELETE_PATIENT',
@@ -183,7 +184,7 @@ export class PatientsService {
           patientName,
           passportNumber: passportNo,
           deletedReportsCount: reportIds.length,
-          deletedBy: user?.email || user?.fullName || 'Super Admin',
+          deletedBy: user?.email || user?.fullName || 'Admin',
         },
       });
       await manager.save(AuditLog, auditEntry);

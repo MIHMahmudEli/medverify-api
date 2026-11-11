@@ -82,8 +82,8 @@ export class PatientsController {
     return this.patientsService.unarchive(id);
   }
 
-  @ApiOperation({ summary: 'Permanently delete patient profile (Super Admin only)' })
-  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Permanently delete patient profile and associated reports' })
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @Delete(':id')
   async remove(@Param('id') id: string, @CurrentUser() user: User) {
     return this.patientsService.deletePatient(id, user);
