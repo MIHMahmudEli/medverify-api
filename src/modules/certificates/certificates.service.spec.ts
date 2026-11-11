@@ -24,6 +24,11 @@ describe('CertificatesService', () => {
     mockCertRepo = {
       count: jest.fn().mockResolvedValue(10),
       findOne: jest.fn(),
+      createQueryBuilder: jest.fn(() => ({
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      })),
       create: jest.fn((dto) => dto),
       save: jest.fn((cert) => Promise.resolve({ id: 'cert-uuid-1', ...cert })),
     };

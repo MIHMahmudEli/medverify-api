@@ -76,6 +76,44 @@ export class ReportsService {
     return regNo;
   }
 
+  private async generateCertificateNumber(prefix: string): Promise<string> {
+    const year = new Date().getFullYear();
+    const cleanPrefix = (prefix || 'MC').trim().toUpperCase();
+    const prefixPattern = `${cleanPrefix}-${year}-`;
+
+    let maxSeq = 0;
+    if (this.certificateRepository.createQueryBuilder) {
+      const existing = await this.certificateRepository
+        .createQueryBuilder('cert')
+        .select('cert.certificateNumber', 'certificateNumber')
+        .where('cert.certificateNumber LIKE :pattern', { pattern: `${prefixPattern}%` })
+        .getRawMany();
+
+      for (const row of existing) {
+        if (row?.certificateNumber && typeof row.certificateNumber === 'string') {
+          const numPart = row.certificateNumber.substring(prefixPattern.length);
+          const parsed = parseInt(numPart, 10);
+          if (!isNaN(parsed) && parsed > maxSeq) {
+            maxSeq = parsed;
+          }
+        }
+      }
+    } else {
+      const count = await this.certificateRepository.count();
+      maxSeq = count;
+    }
+
+    let nextSeq = maxSeq + 1;
+    let candidate = `${prefixPattern}${String(nextSeq).padStart(5, '0')}`;
+
+    while (await this.certificateRepository.findOne({ where: { certificateNumber: candidate } })) {
+      nextSeq++;
+      candidate = `${prefixPattern}${String(nextSeq).padStart(5, '0')}`;
+    }
+
+    return candidate;
+  }
+
   async findAll(
     query: PaginationQueryDto & {
       status?: ReportStatus;
@@ -380,13 +418,13 @@ export class ReportsService {
 
     if (!cert && report.status === ReportStatus.FINALIZED) {
       const systemAdminId = report.finalizedById || report.createdById;
-      const certCount = await this.certificateRepository.count();
-      const seq = String(certCount + 1).padStart(5, '0');
-      const year = new Date().getFullYear();
+      const settings = await this.settingsRepository.findOne({ where: {} });
+      const certPrefix = settings?.certificateNumberPrefix || 'MC';
+      const certNumber = await this.generateCertificateNumber(certPrefix);
       const newCert = this.certificateRepository.create({
         reportId: report.id,
         patientId: report.patientId,
-        certificateNumber: `MC-${year}-${seq}`,
+        certificateNumber: certNumber,
         verificationToken: require('crypto').randomBytes(24).toString('hex'),
         status: CertificateStatus.ACTIVE,
         issuedAt: new Date(),

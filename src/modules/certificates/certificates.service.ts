@@ -41,13 +41,45 @@ export class CertificatesService {
 
   /**
    * Generates a safe, sequential, unique certificate number.
-   * Format: PREFIX-YEAR-SEQUENCE (e.g. MC-2026-00101)
+   * Format: PREFIX-YEAR-SEQUENCE (e.g. MC-2026-00006)
+   * Prevents duplicate key collisions by finding the highest existing sequence.
    */
   private async generateCertificateNumber(prefix: string): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await this.certificateRepository.count();
-    const seq = (count + 1).toString().padStart(5, '0');
-    return `${prefix}-${year}-${seq}`;
+    const cleanPrefix = (prefix || 'MC').trim().toUpperCase();
+    const prefixPattern = `${cleanPrefix}-${year}-`;
+
+    let maxSeq = 0;
+    if (this.certificateRepository.createQueryBuilder) {
+      const existing = await this.certificateRepository
+        .createQueryBuilder('cert')
+        .select('cert.certificateNumber', 'certificateNumber')
+        .where('cert.certificateNumber LIKE :pattern', { pattern: `${prefixPattern}%` })
+        .getRawMany();
+
+      for (const row of existing) {
+        if (row?.certificateNumber && typeof row.certificateNumber === 'string') {
+          const numPart = row.certificateNumber.substring(prefixPattern.length);
+          const parsed = parseInt(numPart, 10);
+          if (!isNaN(parsed) && parsed > maxSeq) {
+            maxSeq = parsed;
+          }
+        }
+      }
+    } else {
+      const count = await this.certificateRepository.count();
+      maxSeq = count;
+    }
+
+    let nextSeq = maxSeq + 1;
+    let candidate = `${prefixPattern}${String(nextSeq).padStart(5, '0')}`;
+
+    while (await this.certificateRepository.findOne({ where: { certificateNumber: candidate } })) {
+      nextSeq++;
+      candidate = `${prefixPattern}${String(nextSeq).padStart(5, '0')}`;
+    }
+
+    return candidate;
   }
 
   /**
