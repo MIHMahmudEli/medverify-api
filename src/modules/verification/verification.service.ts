@@ -12,6 +12,7 @@ import * as crypto from 'crypto';
 import { ReportVerificationToken } from '../../database/entities/report-verification-token.entity';
 import { MedicalReport, ReportStatus } from '../../database/entities/medical-report.entity';
 import { MedicalCertificate, CertificateStatus } from '../../database/entities/medical-certificate.entity';
+import { OrganizationSettings } from '../../database/entities/organization-settings.entity';
 import { ConfigService } from '@nestjs/config';
 import { SettingsService } from '../settings/settings.service';
 import { PdfService } from '../pdf/pdf.service';
@@ -181,29 +182,30 @@ export class VerificationService {
     return `${start}****${end}`;
   }
 
-  async verifyPublicToken(token: string): Promise<PublicVerificationResponse> {
-    const settings = await this.settingsService.getSettings();
-    const disclosure = settings.publicDisclosure || {
-      patientNameMode: 'INITIALS',
-      showPassport: false,
-      showDob: false,
-      showNationality: true,
-      showDestination: true,
-      showDetailedReport: false,
-      allowedReportSections: ['physical', 'systemic', 'lab', 'xray'],
-      allowPublicDownload: true,
-      allowPublicPrint: true,
-    };
+  private async resolveReportOrganization(report: MedicalReport | null): Promise<OrganizationSettings> {
+    if (report?.organization) {
+      return report.organization;
+    }
+    if (report?.organizationId) {
+      try {
+        const specific = await this.settingsService.getSettings(report.organizationId);
+        if (specific) return specific;
+      } catch (e) {}
+    }
+    return this.settingsService.getSettings();
+  }
 
+  async verifyPublicToken(token: string): Promise<PublicVerificationResponse> {
     // 1. Check DRAFT preview tokens
     if (token.startsWith('preview-')) {
       const regNo = token.replace('preview-', '');
       const report = await this.reportRepository.findOne({
         where: { registrationNumber: regNo },
-        relations: ['patient'],
+        relations: ['patient', 'organization'],
       });
 
       if (report) {
+        const reportOrg = await this.resolveReportOrganization(report);
         const maskedInitials = this.maskName(report.patient?.fullName || '');
         const p = report.patient;
         return {
@@ -215,16 +217,16 @@ export class VerificationService {
           patientInitials: maskedInitials,
           destinationCountry: p?.country,
           agency: p?.agency,
-          issuingOrganization: settings.orgName || 'MYSA Medical Center',
+          issuingOrganization: reportOrg.orgName || 'Medical Center',
           settings: {
-            orgName: settings.orgName || 'MYSA Medical Center',
-            orgCode: settings.orgCode || 'MMS',
-            orgAddress: settings.orgAddress || 'Diagnostic & Medical Checkup Centre for Overseas Employment',
-            orgAddressLine2: settings.orgAddressLine2 || '',
-            orgPhone: settings.orgPhone || '+880 1700-000000',
-            orgEmail: settings.orgEmail || 'info@mysamedicalbd.com',
-            reportHeaderTitle: settings.reportHeaderTitle || 'MEDICAL TEST REPORT',
-            logoUrl: settings.logoUrl,
+            orgName: reportOrg.orgName || 'Medical Center',
+            orgCode: reportOrg.orgCode || 'MMS',
+            orgAddress: reportOrg.orgAddress || '',
+            orgAddressLine2: reportOrg.orgAddressLine2 || '',
+            orgPhone: reportOrg.orgPhone || '',
+            orgEmail: reportOrg.orgEmail || '',
+            reportHeaderTitle: reportOrg.reportHeaderTitle || 'MEDICAL TEST REPORT',
+            logoUrl: reportOrg.logoUrl,
           },
           message:
             'This medical examination report is currently in DRAFT status and has not been officially finalized or certified yet.',
@@ -268,7 +270,7 @@ export class VerificationService {
     // 2. Lookup in MedicalCertificate repository
     let certificate = await this.certificateRepository.findOne({
       where: { verificationToken: token },
-      relations: ['report', 'report.patient', 'patient', 'issuedBy'],
+      relations: ['report', 'report.patient', 'report.organization', 'patient', 'issuedBy'],
     });
 
     let report: MedicalReport | null = null;
@@ -280,7 +282,7 @@ export class VerificationService {
       // Lookup in legacy/direct ReportVerificationToken
       tokenRecord = await this.tokenRepository.findOne({
         where: { token },
-        relations: ['report', 'report.patient'],
+        relations: ['report', 'report.patient', 'report.organization'],
       });
 
       if (tokenRecord && tokenRecord.report) {
@@ -302,6 +304,20 @@ export class VerificationService {
       };
     }
 
+    // Resolve issuing organization specific to this report
+    const reportOrg = await this.resolveReportOrganization(report);
+    const disclosure = reportOrg.publicDisclosure || {
+      patientNameMode: 'INITIALS',
+      showPassport: false,
+      showDob: false,
+      showNationality: true,
+      showDestination: true,
+      showDetailedReport: false,
+      allowedReportSections: ['physical', 'systemic', 'lab', 'xray'],
+      allowPublicDownload: true,
+      allowPublicPrint: true,
+    };
+
     // Determine status: REVOKED, SUPERSEDED, EXPIRED, VALID, INVALID
     const isRevoked =
       certificate?.status === CertificateStatus.REVOKED ||
@@ -314,7 +330,7 @@ export class VerificationService {
         status: 'REVOKED',
         registrationNumber: report.registrationNumber,
         registeredAt: report.registeredAt,
-        issuingOrganization: settings.orgName || 'MYSA Medical Center',
+        issuingOrganization: reportOrg.orgName || 'Medical Center',
         revocationReason:
           certificate?.revocationReason ||
           tokenRecord?.revocationReason ||
@@ -334,7 +350,7 @@ export class VerificationService {
         status: 'SUPERSEDED',
         registrationNumber: report.registrationNumber,
         registeredAt: report.registeredAt,
-        issuingOrganization: settings.orgName || 'MYSA Medical Center',
+        issuingOrganization: reportOrg.orgName || 'Medical Center',
         message: 'This certificate has been superseded by a newer clinical amendment. Please verify the updated report.',
       };
     }
@@ -349,7 +365,7 @@ export class VerificationService {
         status: 'EXPIRED',
         registrationNumber: report.registrationNumber,
         registeredAt: report.registeredAt,
-        issuingOrganization: settings.orgName || 'MYSA Medical Center',
+        issuingOrganization: reportOrg.orgName || 'Medical Center',
         message: `This certificate expired on ${certificate?.expiresAt ? new Date(certificate.expiresAt).toLocaleDateString() : 'its scheduled expiration date'}.`,
       };
     }
@@ -431,12 +447,12 @@ export class VerificationService {
         issueDate: certificate?.issuedAt ? certificate.issuedAt.toISOString() : report.finalizedAt?.toISOString() || report.registeredAt,
         expiresAt: certificate?.expiresAt ? certificate.expiresAt.toISOString() : undefined,
         status: 'VALID',
-        issuingOrganization: settings.orgName || 'MYSA Medical Center',
+        issuingOrganization: reportOrg.orgName || 'Medical Center',
         finalMedicalStatus: report.finalMedicalStatus || 'FIT',
         authorizedSignatory: {
-          name: settings.signatoryName || 'Dr. A. K. M. Shamsuddin',
-          designation: settings.signatoryDesignation || 'MBBS, FCPS - Medical Director',
-          licenseNumber: settings.signatoryLicenseNumber || 'BMDC Reg No: A-12345',
+          name: reportOrg.signatoryName || 'Medical Director',
+          designation: reportOrg.signatoryDesignation || 'MBBS, FCPS - Medical Director',
+          licenseNumber: reportOrg.signatoryLicenseNumber || 'BMDC Reg No: A-12345',
         },
       },
       patient: {
@@ -474,21 +490,21 @@ export class VerificationService {
       registeredAt: report.registeredAt,
       finalMedicalStatus: report.finalMedicalStatus,
       finalizedAt: report.finalizedAt,
-      issuingOrganization: settings.orgName || 'MYSA Medical Center',
+      issuingOrganization: reportOrg.orgName || 'Medical Center',
       patientInitials: maskedInitials,
       destinationCountry: patientRaw?.country,
       agency: patientRaw?.agency,
       allowPublicDownload: disclosure.allowPublicDownload !== false,
       allowPublicPrint: disclosure.allowPublicPrint !== false,
       settings: {
-        orgName: settings.orgName || 'MYSA Medical Center',
-        orgCode: settings.orgCode || 'MMS',
-        orgAddress: settings.orgAddress || 'Diagnostic & Medical Checkup Centre for Overseas Employment',
-        orgAddressLine2: settings.orgAddressLine2 || '',
-        orgPhone: settings.orgPhone || '+880 1700-000000',
-        orgEmail: settings.orgEmail || 'info@mysamedicalbd.com',
-        reportHeaderTitle: settings.reportHeaderTitle || 'MEDICAL TEST REPORT',
-        logoUrl: settings.logoUrl,
+        orgName: reportOrg.orgName || 'Medical Center',
+        orgCode: reportOrg.orgCode || 'MMS',
+        orgAddress: reportOrg.orgAddress || '',
+        orgAddressLine2: reportOrg.orgAddressLine2 || '',
+        orgPhone: reportOrg.orgPhone || '',
+        orgEmail: reportOrg.orgEmail || '',
+        reportHeaderTitle: reportOrg.reportHeaderTitle || 'MEDICAL TEST REPORT',
+        logoUrl: reportOrg.logoUrl,
       },
     };
   }
@@ -506,13 +522,6 @@ export class VerificationService {
    * Page 2: Detailed Clinical Test Report
    */
   async getPublicCombinedPdfBuffer(token: string): Promise<{ buffer: Buffer; filename: string }> {
-    const settings = await this.settingsService.getSettings();
-    if (settings.publicDisclosure?.allowPublicDownload === false) {
-      throw new ForbiddenException(
-        'Public downloading of official medical records is restricted by organizational policy.',
-      );
-    }
-
     let report: MedicalReport | null = null;
     let certificate: MedicalCertificate | null = null;
 
@@ -520,13 +529,13 @@ export class VerificationService {
       const regNo = token.replace('preview-', '');
       report = await this.reportRepository.findOne({
         where: { registrationNumber: regNo },
-        relations: ['patient'],
+        relations: ['patient', 'organization'],
       });
       if (!report) throw new NotFoundException('Medical report not found');
     } else {
       certificate = await this.certificateRepository.findOne({
         where: { verificationToken: token },
-        relations: ['report', 'report.patient', 'patient', 'issuedBy'],
+        relations: ['report', 'report.patient', 'report.organization', 'patient', 'issuedBy'],
       });
 
       if (certificate) {
@@ -534,7 +543,7 @@ export class VerificationService {
       } else {
         const tokenRecord = await this.tokenRepository.findOne({
           where: { token },
-          relations: ['report', 'report.patient'],
+          relations: ['report', 'report.patient', 'report.organization'],
         });
 
         if (tokenRecord && tokenRecord.report) {
@@ -550,6 +559,13 @@ export class VerificationService {
 
     if (!report) {
       throw new NotFoundException('Medical record not found for this verification signature.');
+    }
+
+    const reportOrg = await this.resolveReportOrganization(report);
+    if (reportOrg.publicDisclosure?.allowPublicDownload === false) {
+      throw new ForbiddenException(
+        'Public downloading of official medical records is restricted by organizational policy.',
+      );
     }
 
     let patient = report.patient || certificate?.patient;
@@ -570,7 +586,7 @@ export class VerificationService {
         certificate,
         report,
         patient,
-        settings,
+        reportOrg,
       );
     } else {
       // Draft / pre-approval preview combined document
@@ -584,7 +600,7 @@ export class VerificationService {
         previewCert,
         report,
         patient,
-        settings,
+        reportOrg,
       );
     }
 

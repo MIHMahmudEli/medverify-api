@@ -218,10 +218,13 @@ export class ReportsService {
     let org: OrganizationSettings | null = null;
     if (dto.organizationId) {
       org = await this.settingsRepository.findOne({ where: { id: dto.organizationId } });
+      if (!org) {
+        throw new NotFoundException(`Issuing clinical organization with ID "${dto.organizationId}" not found`);
+      }
     }
     if (!org) {
       org =
-        (await this.settingsRepository.findOne({ where: { isDefault: true } })) ||
+        (await this.settingsRepository.findOne({ where: { isActive: true }, order: { createdAt: 'ASC' } })) ||
         (await this.settingsRepository.findOne({ where: {}, order: { createdAt: 'ASC' } }));
     }
 
@@ -425,8 +428,8 @@ export class ReportsService {
       report.organization ||
       (report.organizationId
         ? await this.settingsRepository.findOne({ where: { id: report.organizationId } })
-        : await this.settingsRepository.findOne({ where: { isDefault: true } })) ||
-      (await this.settingsRepository.findOne({ where: {} }));
+        : null) ||
+      (await this.settingsRepository.findOne({ where: {}, order: { createdAt: 'ASC' } }));
 
     const buffer = await this.pdfService.generateReportPdf(report, report.patient, orgSettings || undefined);
     const filename = `MedVerify_${report.registrationNumber}_${report.patient.passportNumber}.pdf`;
@@ -444,8 +447,8 @@ export class ReportsService {
       report.organization ||
       (report.organizationId
         ? await this.settingsRepository.findOne({ where: { id: report.organizationId } })
-        : await this.settingsRepository.findOne({ where: { isDefault: true } })) ||
-      (await this.settingsRepository.findOne({ where: {} }));
+        : null) ||
+      (await this.settingsRepository.findOne({ where: {}, order: { createdAt: 'ASC' } }));
 
     if (!cert && report.status === ReportStatus.FINALIZED) {
       const systemAdminId = report.finalizedById || report.createdById;

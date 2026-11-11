@@ -206,7 +206,10 @@ export class PdfService {
     settings?: OrganizationSettings,
     opts: PdfRenderOptions = {},
   ) {
-    const orgName = settings?.orgName || 'MYSA Medical Center';
+    if (!settings && report?.organization) {
+      settings = report.organization;
+    }
+    const orgName = settings?.orgName || 'Medical Center';
     const orgAddress =
       settings?.orgAddress ||
       'Diagnostic & Medical Checkup Centre for Overseas Employment';
@@ -735,6 +738,14 @@ export class PdfService {
       opts = maybeOpts || {};
     }
 
+    if (!settings && report?.organization) {
+      settings = report.organization;
+    }
+    if (!settings && report?.organizationId && this.settingsService) {
+      try {
+        settings = await this.settingsService.getSettings(report.organizationId);
+      } catch (err) {}
+    }
     if (!settings && this.settingsService) {
       try {
         settings = await this.settingsService.getSettings();

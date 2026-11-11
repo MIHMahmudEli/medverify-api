@@ -22,10 +22,7 @@ export class SettingsService implements OnModuleInit {
       if (specific) return specific;
     }
 
-    let settings = await this.settingsRepository.findOne({ where: { isDefault: true } });
-    if (!settings) {
-      settings = await this.settingsRepository.findOne({ where: {}, order: { createdAt: 'ASC' } });
-    }
+    let settings = await this.settingsRepository.findOne({ where: {}, order: { createdAt: 'ASC' } });
     if (!settings) {
       settings = this.settingsRepository.create({
         orgName: 'MYSA Medical Center',

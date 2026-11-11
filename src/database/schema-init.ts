@@ -46,21 +46,13 @@ export async function ensureSchema(dataSource: DataSource) {
       ADD COLUMN IF NOT EXISTS "createdAt" timestamptz DEFAULT now();
     `);
 
-    // Ensure at least one organization has isDefault = true
-    await dataSource.query(`
-      UPDATE organization_settings
-      SET "isDefault" = true
-      WHERE id = (SELECT id FROM organization_settings ORDER BY "createdAt" ASC, "updatedAt" ASC LIMIT 1)
-        AND NOT EXISTS (SELECT 1 FROM organization_settings WHERE "isDefault" = true);
-    `).catch(() => {});
-
     // 3. Add organizationId to medical_reports and associate existing reports
     await dataSource.query(`
       ALTER TABLE medical_reports
       ADD COLUMN IF NOT EXISTS "organizationId" uuid;
       CREATE INDEX IF NOT EXISTS "IDX_med_reports_organizationId" ON medical_reports ("organizationId");
       UPDATE medical_reports
-      SET "organizationId" = (SELECT id FROM organization_settings WHERE "isDefault" = true LIMIT 1)
+      SET "organizationId" = (SELECT id FROM organization_settings ORDER BY "createdAt" ASC LIMIT 1)
       WHERE "organizationId" IS NULL;
     `).catch(() => {});
 

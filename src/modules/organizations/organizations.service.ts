@@ -24,7 +24,6 @@ export class OrganizationsService {
   async findAll(): Promise<any[]> {
     const orgs = await this.organizationRepository.find({
       order: {
-        isDefault: 'DESC',
         createdAt: 'ASC',
       },
     });
@@ -57,14 +56,9 @@ export class OrganizationsService {
 
   async getDefault(): Promise<OrganizationSettings> {
     let org = await this.organizationRepository.findOne({
-      where: { isDefault: true },
+      where: {},
+      order: { createdAt: 'ASC' },
     });
-    if (!org) {
-      org = await this.organizationRepository.findOne({
-        where: {},
-        order: { createdAt: 'ASC' },
-      });
-    }
     if (!org) {
       org = this.organizationRepository.create({
         orgName: 'MYSA Medical Center',
@@ -82,7 +76,6 @@ export class OrganizationsService {
         certificateFooter:
           'This official certificate verifies fitness for overseas employment. Authenticate online using the security QR code.',
         certificateValidityDays: 90,
-        isDefault: true,
         isActive: true,
       });
       org = await this.organizationRepository.save(org);
@@ -98,10 +91,6 @@ export class OrganizationsService {
       throw new BadRequestException(
         `Organization code "${dto.orgCode}" is already in use by "${existing.orgName}"`,
       );
-    }
-
-    if (dto.isDefault) {
-      await this.organizationRepository.update({}, { isDefault: false });
     }
 
     const org = this.organizationRepository.create({
@@ -127,10 +116,6 @@ export class OrganizationsService {
       }
     }
 
-    if (dto.isDefault) {
-      await this.organizationRepository.update({}, { isDefault: false });
-    }
-
     Object.assign(org, {
       ...dto,
       ...(dto.orgCode ? { orgCode: dto.orgCode.trim().toUpperCase() } : {}),
@@ -144,19 +129,11 @@ export class OrganizationsService {
 
   async setDefault(id: string): Promise<OrganizationSettings> {
     const org = await this.findOne(id);
-    await this.organizationRepository.update({}, { isDefault: false });
-    org.isDefault = true;
-    return this.organizationRepository.save(org);
+    return org;
   }
 
   async delete(id: string): Promise<{ success: boolean; message: string }> {
     const org = await this.findOne(id);
-
-    if (org.isDefault) {
-      throw new BadRequestException(
-        'Cannot delete the primary default organization. Please set another organization as default first.',
-      );
-    }
 
     const reportCount = await this.reportRepository.count({
       where: { organizationId: id },
